@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Trip Planner — Group Travel Companion (Live Sync)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1e;color:#eef2ff}
+:root{--primary:#3b82f6;--primary-dark:#2563eb;--success:#10b981;--danger:#ef4444;--warning:#f59e0b;--bg-card:#1e293b;--bg-surface:#0f172a;--border:#334155}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#0f172a}
+::-webkit-scrollbar-thumb{background:#3b82f6;border-radius:10px}
+input,select,textarea{font-family:inherit}
+input,select,textarea{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px 12px;color:#eef2ff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6}
+button{cursor:pointer}
+.loading-spinner{display:inline-block;width:20px;height:20px;border:2px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+
+// ========== FIREBASE CONFIG ==========
+const firebaseConfig = {
+  apiKey: "AIzaSyDav3rI7fTr8KrXYxvnz5LB82CgjRq4v20",
+  authDomain: "ais-showroom-dashboard.firebaseapp.com",
+  projectId: "ais-showroom-dashboard",
+  storageBucket: "ais-showroom-dashboard.firebasestorage.app",
+  messagingSenderId: "175667492150",
+  appId: "1:175667492150:web:cb124eb267b4689e6a2f97"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ========== CONFIG ==========
+const VALID_USERS = [
+  { username: "Sanjug", password: "AIStrip@001", role: "admin", email: "sanjug@trip.com" },
+  { username: "Manishk", password: "AIStrip@001", role: "member", email: "manishk@trip.com" },
+  { username: "Atikab", password: "AIStrip@001", role: "member", email: "atikab@trip.com" }
+];
+
+const DAYS = Array.from({ length: 10 }, (_, i) => ({
+  id: i + 1,
+  label: `Day ${i + 1}`,
+  date: new Date(Date.now() + (i * 86400000)).toISOString().slice(0,10)
+}));
+
+const TRIP_ID = "current_trip";
+
+// ========== HELPERS ==========
+const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const calculateExpenseSummary = (expenses, members) => {
+  const memberNames = members.map(m => m.name);
+  let totalSpent = 0;
+  const paidByUser = {};
+  const sharePerUser = {};
+  memberNames.forEach(name => { paidByUser[name] = 0; sharePerUser[name] = 0; });
+  expenses.forEach(exp => {
+    totalSpent += exp.amount;
+    paidByUser[exp.paidBy] = (paidByUser[exp.paidBy] || 0) + exp.amount;
+    const perPersonShare = exp.amount / exp.splitAmong.length;
+    exp.splitAmong.forEach(person => { sharePerUser[person] = (sharePerUser[person] || 0) + perPersonShare; });
+  });
+  const balance = {};
+  memberNames.forEach(name => { balance[name] = paidByUser[name] - sharePerUser[name]; });
+  return { totalSpent, avgPerPerson: totalSpent / memberNames.length, paidByUser, sharePerUser, balance };
+};
+
+// ========== LOGIN PAGE ==========
+const LoginPage = ({ onLogin }) => {
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+
+    const handleSubmit = (e) => {
+    e.preventDefault();
+    const user = VALID_USERS.find(u => u.username === username && u.password === password);
+    if (user) {
+      setLoading(true);
+      // Just store in localStorage, no Firebase Auth
+      localStorage.setItem("trip_auth", JSON.stringify({ username: user.username, role: user.role }));
+      onLogin({ username: user.username, role: user.role });
+      // DON'T setLoading(false) here - let the app handle it
+    } else {
+      setError("Invalid username or password");
+    }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:"rgba(30,41,59,0.9)",backdropFilter:"blur(10px)",borderRadius:"24px",padding:"32px",width:"100%",maxWidth:"400px",border:"1px solid #334155"}}>
+        <div style={{textAlign:"center",marginBottom:"24px"}}><div style={{fontSize:"48px",marginBottom:"8px"}}>✈️</div><h1 style={{fontSize:"24px",fontWeight:"bold",color:"white"}}>Trip Planner</h1><p style={{color:"#94a3b8",fontSize:"14px",marginTop:"4px"}}>Group travel companion • Live Sync</p></div>
+        <form onSubmit={handleSubmit}>
+          <div style={{marginBottom:"16px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter username" style={{width:"100%",padding:"10px",borderRadius:"8px",border:"1px solid #334155",background:"#1e293b",color:"white"}} /></div>
+          <div style={{marginBottom:"20px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" style={{width:"100%",padding:"10px",borderRadius:"8px",border:"1px solid #334155",background:"#1e293b",color:"white"}} /></div>
+          {error && <div style={{marginBottom:"16px",color:"#ef4444",fontSize:"14px",textAlign:"center"}}>{error}</div>}
+          <button type="submit" disabled={loading} style={{width:"100%",padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",fontSize:"16px",opacity:loading?0.7:1}}>{loading ? "Loading..." : "Sign In"}</button>
+        </form>
+        <div style={{marginTop:"20px",textAlign:"center",fontSize:"11px",color:"#64748b"}}>Live sync via Firebase • Changes visible to all</div>
+      </div>
+    </div>
+  );
+};
+
+// ========== MAIN APP ==========
+const App = () => {
+  const [authUser, setAuthUser] = React.useState(null);
+  const [tripData, setTripData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState("dashboard");
+  const [activeDay, setActiveDay] = React.useState(1);
+  
+  // Modal states
+  const [showExpenseModal, setShowExpenseModal] = React.useState(false);
+  const [showPollModal, setShowPollModal] = React.useState(false);
+  const [showMemberModal, setShowMemberModal] = React.useState(false);
+  const [showActivityModal, setShowActivityModal] = React.useState(false);
+  const [showPackingModal, setShowPackingModal] = React.useState(false);
+  const [activityDayId, setActivityDayId] = React.useState(1);
+  
+  // Form states
+  const [newExpense, setNewExpense] = React.useState({ date: DAYS[0].date, description: "", amount: "", paidBy: "", splitAmong: [] });
+  const [newPoll, setNewPoll] = React.useState({ question: "", options: ["", ""] });
+  const [newMember, setNewMember] = React.useState("");
+  const [newActivity, setNewActivity] = React.useState({ time: "12:00", title: "", location: "", notes: "" });
+  const [newPackingItem, setNewPackingItem] = React.useState({ category: "Clothing", item: "" });
+  const [isSyncing, setIsSyncing] = React.useState(false);
+
+  // Default trip data
+  const getDefaultTripData = () => ({
+    members: [
+      { id: "m1", name: "Sanjug", isAdmin: true },
+      { id: "m2", name: "Manishk", isAdmin: false },
+      { id: "m3", name: "Atikab", isAdmin: false }
+    ],
+    itinerary: DAYS.map(day => ({
+      dayId: day.id,
+      date: day.date,
+      activities: [
+        { id: generateId(), time: "09:00", title: "Breakfast", location: "Hotel", notes: "" },
+        { id: generateId(), time: "11:00", title: "Visit local market", location: "City Center", notes: "" },
+        { id: generateId(), time: "15:00", title: "Lunch", location: "Local Restaurant", notes: "" },
+        { id: generateId(), time: "18:00", title: "Sunset point", location: "Viewpoint", notes: "" }
+      ]
+    })),
+    packingList: [
+      { id: generateId(), category: "Clothing", item: "T-shirts (3)", checked: false, assignedTo: null },
+      { id: generateId(), category: "Clothing", item: "Jeans/Shorts", checked: false, assignedTo: null },
+      { id: generateId(), category: "Clothing", item: "Jacket/Sweater", checked: false, assignedTo: null },
+      { id: generateId(), category: "Clothing", item: "Underwear & Socks", checked: false, assignedTo: null },
+      { id: generateId(), category: "Toiletries", item: "Toothbrush & Paste", checked: false, assignedTo: null },
+      { id: generateId(), category: "Toiletries", item: "Shampoo & Soap", checked: false, assignedTo: null },
+      { id: generateId(), category: "Toiletries", item: "Sunscreen", checked: false, assignedTo: null },
+      { id: generateId(), category: "Electronics", item: "Phone charger", checked: false, assignedTo: null },
+      { id: generateId(), category: "Electronics", item: "Power bank", checked: false, assignedTo: null },
+      { id: generateId(), category: "Documents", item: "ID proof", checked: false, assignedTo: null },
+      { id: generateId(), category: "Misc", item: "First aid kit", checked: false, assignedTo: null },
+      { id: generateId(), category: "Misc", item: "Snacks", checked: false, assignedTo: null }
+    ],
+    expenses: [
+      { id: generateId(), date: DAYS[0].date, description: "Hotel booking", amount: 15000, paidBy: "Sanjug", splitAmong: ["Sanjug", "Manishk", "Atikab"] },
+      { id: generateId(), date: DAYS[0].date, description: "Dinner", amount: 2400, paidBy: "Manishk", splitAmong: ["Sanjug", "Manishk", "Atikab"] },
+      { id: generateId(), date: DAYS[1].date, description: "Taxi fare", amount: 1200, paidBy: "Atikab", splitAmong: ["Sanjug", "Manishk", "Atikab"] }
+    ],
+    polls: [
+      { id: generateId(), question: "Where should we have dinner on Day 2?", options: ["Indian restaurant", "Italian place", "Street food"], votes: { "Indian restaurant": 2, "Italian place": 1, "Street food": 0 }, createdBy: "Sanjug" }
+    ]
+  });
+
+  // Load data from Firestore
+  // Load data from Firestore (no auth check)
+  // Load data from Firestore (runs once on mount)
+  React.useEffect(() => {
+    const loadData = async () => {
+      const savedAuth = localStorage.getItem("trip_auth");
+      if (savedAuth) {
+        const user = JSON.parse(savedAuth);
+        setAuthUser(user);
+        
+        try {
+          const docRef = db.collection("trips").doc(TRIP_ID);
+          const doc = await docRef.get();
+          if (doc.exists) {
+            setTripData(doc.data());
+          } else {
+            const defaultData = getDefaultTripData();
+            await docRef.set(defaultData);
+            setTripData(defaultData);
+          }
+        } catch (error) {
+          console.error("Firestore error:", error);
+        }
+      }
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // Load trip data when authUser changes (after login)
+   // Load trip data when authUser changes (after login)
+  React.useEffect(() => {
+    if (!authUser) return;
+    
+    const loadTripData = async () => {
+      try {
+        const docRef = db.collection("trips").doc(TRIP_ID);
+        const doc = await docRef.get();
+        if (doc.exists) {
+          setTripData(doc.data());
+        } else {
+          const defaultData = getDefaultTripData();
+          await docRef.set(defaultData);
+          setTripData(defaultData);
+        }
+      } catch (error) {
+        console.error("Firestore error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTripData();
+  }, [authUser]);
+
+  // Listen for real-time updates after login
+  React.useEffect(() => {
+    if (!authUser || !tripData) return;
+    
+    const unsubscribe = db.collection("trips").doc(TRIP_ID)
+      .onSnapshot((doc) => {
+        if (doc.exists) {
+          setTripData(doc.data());
+        }
+      }, (error) => {
+        console.error("Firestore error:", error);
+      });
+    return () => unsubscribe();
+  }, [authUser]);
+
+  // Update Firestore
+  const updateTripData = async (newData) => {
+    if (!authUser) return;
+    setIsSyncing(true);
+    try {
+      await db.collection("trips").doc(TRIP_ID).set(newData);
+      // Don't set local state here - it will update via onSnapshot
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("Failed to save. Please check your connection.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleLogout = () => {
+  localStorage.removeItem("trip_auth");
+  setAuthUser(null);
+  setTripData(null);
+};
+  
+  if (loading) {
+    return (
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div className="loading-spinner" style={{width:"40px",height:"40px"}}></div>
+      </div>
+    );
+  }
+  
+  if (!authUser || !tripData) return <LoginPage onLogin={(user) => {
+    setAuthUser(user);
+    setLoading(true);
+  }} />;
+  
+  const isAdmin = authUser.role === "admin";
+  const expenseSummary = calculateExpenseSummary(tripData.expenses || [], tripData.members || []);
+  const currentDay = DAYS.find(d => d.id === activeDay);
+  
+  // Add functions
+  const addExpense = () => {
+    if (!newExpense.description || !newExpense.amount || !newExpense.paidBy || newExpense.splitAmong.length === 0) {
+      alert("Please fill all fields");
+      return;
+    }
+    const expense = { id: generateId(), date: newExpense.date, description: newExpense.description, amount: parseFloat(newExpense.amount), paidBy: newExpense.paidBy, splitAmong: newExpense.splitAmong };
+    updateTripData({ ...tripData, expenses: [...(tripData.expenses || []), expense] });
+    setShowExpenseModal(false);
+    setNewExpense({ date: DAYS[0].date, description: "", amount: "", paidBy: tripData.members[0]?.name || "", splitAmong: tripData.members.map(m => m.name) });
+  };
+  
+  const addPoll = () => {
+    if (!newPoll.question || newPoll.options.some(o => !o.trim())) { alert("Please fill poll question and all options"); return; }
+    const poll = { id: generateId(), question: newPoll.question, options: newPoll.options.filter(o => o.trim()), votes: {}, createdBy: authUser.username };
+    poll.options.forEach(opt => { poll.votes[opt] = 0; });
+    updateTripData({ ...tripData, polls: [...(tripData.polls || []), poll] });
+    setShowPollModal(false);
+    setNewPoll({ question: "", options: ["", ""] });
+  };
+  
+  const addMember = () => {
+    if (!newMember.trim()) { alert("Please enter member name"); return; }
+    if (tripData.members.length >= 10) { alert("Maximum 10 members allowed"); return; }
+    updateTripData({ ...tripData, members: [...tripData.members, { id: generateId(), name: newMember.trim(), isAdmin: false }] });
+    setShowMemberModal(false);
+    setNewMember("");
+  };
+  
+  const addActivity = () => {
+    if (!newActivity.title) { alert("Please enter activity title"); return; }
+    const act = { id: generateId(), time: newActivity.time, title: newActivity.title, location: newActivity.location, notes: newActivity.notes };
+    const updatedItinerary = tripData.itinerary.map(d => d.dayId === activityDayId ? { ...d, activities: [...d.activities, act] } : d);
+    updateTripData({ ...tripData, itinerary: updatedItinerary });
+    setShowActivityModal(false);
+    setNewActivity({ time: "12:00", title: "", location: "", notes: "" });
+  };
+  
+  const addPackingItem = () => {
+    if (!newPackingItem.item) { alert("Please enter item name"); return; }
+    updateTripData({ ...tripData, packingList: [...(tripData.packingList || []), { id: generateId(), category: newPackingItem.category, item: newPackingItem.item, checked: false, assignedTo: null }] });
+    setShowPackingModal(false);
+    setNewPackingItem({ category: "Clothing", item: "" });
+  };
+  
+  // Delete functions
+  const deleteExpense = (id) => updateTripData({ ...tripData, expenses: tripData.expenses.filter(e => e.id !== id) });
+  const deletePoll = (id) => updateTripData({ ...tripData, polls: tripData.polls.filter(p => p.id !== id) });
+  const deleteMember = (id) => { if (tripData.members.length <= 1) { alert("At least one member required"); return; } updateTripData({ ...tripData, members: tripData.members.filter(m => m.id !== id) }); };
+  const deleteActivity = (dayId, activityId) => {
+    const updatedItinerary = tripData.itinerary.map(d => d.dayId === dayId ? { ...d, activities: d.activities.filter(a => a.id !== activityId) } : d);
+    updateTripData({ ...tripData, itinerary: updatedItinerary });
+  };
+  const deletePackingItem = (id) => updateTripData({ ...tripData, packingList: tripData.packingList.filter(i => i.id !== id) });
+  const togglePackingItem = (id) => {
+    const updated = tripData.packingList.map(i => i.id === id ? { ...i, checked: !i.checked } : i);
+    updateTripData({ ...tripData, packingList: updated });
+  };
+  const votePoll = (pollId, option) => {
+    const updated = tripData.polls.map(p => p.id === pollId ? { ...p, votes: { ...p.votes, [option]: (p.votes[option] || 0) + 1 } } : p);
+    updateTripData({ ...tripData, polls: updated });
+  };
+  const resetToDefault = () => { if(confirm("Reset all data to default?")) updateTripData(getDefaultTripData()); };
+  
+  // Render functions (same as before but using tripData)
+  const renderDashboard = () => {
+    const packedItems = tripData.packingList?.filter(i => i.checked).length || 0;
+    const upcomingActivities = tripData.itinerary?.flatMap(day => day.activities.map(a => ({ ...a, dayId: day.dayId }))).slice(0, 5) || [];
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
+        {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"12px"}}>
+          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#3b82f6"}}>{tripData.members?.length || 0}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Members</div></div>
+          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#10b981"}}>₹{expenseSummary.totalSpent.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Total Spent</div></div>
+          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#f59e0b"}}>₹{expenseSummary.avgPerPerson.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Avg/Person</div></div>
+          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#a78bfa"}}>{packedItems}/{tripData.packingList?.length || 0}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Packed</div></div>
+        </div>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>📋 Upcoming Activities</h3>{upcomingActivities.length === 0 && <div style={{color:"#64748b",textAlign:"center",padding:"20px"}}>No activities planned</div>}{upcomingActivities.map((act, idx) => (<div key={idx} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}><span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace"}}>{act.time}</span><span>{act.title}</span><span style={{marginLeft:"auto",fontSize:"11px",color:"#64748b"}}>Day {act.dayId}</span></div>))}</div>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>💰 Who Owes Whom</h3>{tripData.members?.map(member => { const bal = expenseSummary.balance[member.name]; return (<div key={member.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}><span>{member.name} {member.isAdmin && <span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"4px"}}>(Admin)</span>}</span><span style={{color: bal > 0 ? "#10b981" : bal < 0 ? "#ef4444" : "#94a3b8"}}>{bal > 0 ? `+₹${bal.toFixed(0)}` : bal < 0 ? `-₹${Math.abs(bal).toFixed(0)}` : '₹0'}</span></div>);})}</div>
+      </div>
+    );
+  };
+  
+  const renderItinerary = () => (
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+      <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"8px"}}>{DAYS.map(day => (<button key={day.id} onClick={() => setActiveDay(day.id)} style={{padding:"8px 16px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background: activeDay === day.id ? "#3b82f6" : "#1e293b",color:"white",cursor:"pointer"}}>{day.label} <span style={{fontSize:"11px",opacity:0.7}}>{day.date.slice(5)}</span></button>))}</div>
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}><h3 style={{fontWeight:"600"}}>Activities for {currentDay?.label}</h3>{isAdmin && <button onClick={() => { setActivityDayId(activeDay); setShowActivityModal(true); }} style={{padding:"6px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>+ Add</button>}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>{tripData.itinerary?.find(d => d.dayId === activeDay)?.activities.map(act => (<div key={act.id} style={{display:"flex",alignItems:"flex-start",gap:"12px",background:"#0f172a",padding:"12px",borderRadius:"8px"}}><div style={{color:"#3b82f6",fontFamily:"monospace",fontSize:"13px",minWidth:"60px"}}>{act.time}</div><div style={{flex:1}}><div style={{fontWeight:"500"}}>{act.title}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>{act.location}</div><div style={{fontSize:"11px",color:"#64748b",marginTop:"4px"}}>{act.notes}</div></div>{isAdmin && <button onClick={() => deleteActivity(activeDay, act.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"18px",cursor:"pointer"}}>🗑️</button>}</div>))}{tripData.itinerary?.find(d => d.dayId === activeDay)?.activities.length === 0 && <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No activities planned for this day</div>}</div>
+      </div>
+    </div>
+  );
+  
+  const renderPacking = () => {
+    const categories = [...new Set(tripData.packingList?.map(p => p.category) || [])];
+    return (<div style={{display:"flex",flexDirection:"column",gap:"16px"}}>{isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}{isAdmin && <button onClick={() => setShowPackingModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Packing Item</button>}{categories.map(cat => (<div key={cat} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>{cat}</h3><div style={{display:"flex",flexDirection:"column",gap:"8px"}}>{tripData.packingList?.filter(i => i.category === cat).map(item => (<div key={item.id} style={{display:"flex",alignItems:"center",gap:"12px"}}><input type="checkbox" checked={item.checked} onChange={() => togglePackingItem(item.id)} style={{width:"18px",height:"18px"}} /><span style={{flex:1,textDecoration: item.checked ? "line-through" : "none",color: item.checked ? "#64748b" : "white"}}>{item.item}</span>{isAdmin && <button onClick={() => deletePackingItem(item.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer"}}>🗑️</button>}</div>))}</div></div>))}</div>);
+  };
+  
+  const renderExpenses = () => (
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"12px"}}>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"bold",color:"#10b981"}}>₹{expenseSummary.totalSpent.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Total</div></div>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"bold",color:"#3b82f6"}}>₹{expenseSummary.avgPerPerson.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Avg/Person</div></div>
+      </div>
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Who Paid</h3>{tripData.members?.map(m => (<div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span>₹{expenseSummary.paidByUser[m.name]?.toLocaleString() || 0}</span></div>))}</div>
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Balances (who owes whom)</h3>{tripData.members?.map(m => { const bal = expenseSummary.balance[m.name]; return (<div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span style={{color: bal > 0 ? "#10b981" : bal < 0 ? "#ef4444" : "#94a3b8"}}>{bal > 0 ? `gets ₹${bal.toFixed(0)}` : bal < 0 ? `owes ₹${Math.abs(bal).toFixed(0)}` : 'settled'}</span></div>);})}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h3 style={{fontWeight:"600"}}>Expense History</h3><button onClick={() => setShowExpenseModal(true)} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white"}}>+ Add Expense</button></div>
+      {tripData.expenses?.map(exp => (<div key={exp.id} style={{background:"#0f172a",borderRadius:"8px",padding:"12px",border:"1px solid #334155"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:"500"}}>{exp.description}</span><span style={{color:"#10b981"}}>₹{exp.amount.toLocaleString()}</span></div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Paid by {exp.paidBy} • Split among {exp.splitAmong.join(", ")}</div>{isAdmin && <button onClick={() => deleteExpense(exp.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>Delete</button>}</div>))}
+    </div>
+  );
+  
+  const renderPolls = () => (
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+      {isAdmin && <button onClick={() => setShowPollModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Create Poll</button>}
+      {tripData.polls?.map(poll => {
+        const total = Object.values(poll.votes).reduce((a,b) => a+b, 0);
+        return (<div key={poll.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>{poll.question}</h3>{poll.options.map(opt => { const votes = poll.votes[opt] || 0; const percent = total ? (votes/total)*100 : 0; return (<div key={opt} style={{marginBottom:"12px"}}><div style={{display:"flex",justifyContent:"space-between",fontSize:"14px",marginBottom:"4px"}}><span>{opt}</span><span>{votes} vote{votes !== 1 ? 's' : ''}</span></div><div style={{background:"#334155",borderRadius:"10px",height:"8px",overflow:"hidden"}}><div style={{width:`${percent}%`,height:"100%",background:"#3b82f6",borderRadius:"10px"}}></div></div><button onClick={() => votePoll(poll.id, opt)} style={{marginTop:"6px",padding:"4px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>Vote</button></div>);})}<div style={{fontSize:"11px",color:"#64748b",marginTop:"8px"}}>Created by {poll.createdBy}</div>{isAdmin && <button onClick={() => deletePoll(poll.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>Delete Poll</button>}</div>);
+      })}
+      {(!tripData.polls || tripData.polls.length === 0) && <div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No polls yet</div>}
+    </div>
+  );
+  
+  const renderMembers = () => (
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+      {isAdmin && <button onClick={() => setShowMemberModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Member</button>}
+      {tripData.members?.map(m => (<div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><div><span style={{fontWeight:"500"}}>{m.name}</span>{m.isAdmin && <span style={{marginLeft:"8px",fontSize:"11px",color:"#f59e0b"}}>Admin</span>}</div>{isAdmin && !m.isAdmin && <button onClick={() => deleteMember(m.id)} style={{padding:"6px 12px",background:"#ef4444",border:"none",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>Remove</button>}</div>))}
+    </div>
+  );
+  
+  const renderSettings = () => (
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Data Management</h3><div style={{display:"flex",flexDirection:"column",gap:"10px"}}><button onClick={resetToDefault} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white"}}>🔄 Reset to Default</button><button onClick={handleLogout} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white"}}>🚪 Sign Out</button></div></div>
+      <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"16px"}}>Trip Planner • Live sync via Firebase • Changes visible to all members</div>
+    </div>
+  );
+  
+  const tabs = [
+    { id: "dashboard", label: "🏠 Dashboard", component: renderDashboard },
+    { id: "itinerary", label: "📅 Itinerary", component: renderItinerary },
+    { id: "packing", label: "🎒 Packing", component: renderPacking },
+    { id: "expenses", label: "💰 Expenses", component: renderExpenses },
+    { id: "polls", label: "📊 Polls", component: renderPolls },
+    { id: "members", label: "👥 Members", component: renderMembers },
+    { id: "settings", label: "⚙️ Settings", component: renderSettings }
+  ];
+  
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)"}}>
+      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"12px 20px",display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:"10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}><div style={{fontSize:"28px"}}>✈️</div><div><h1 style={{fontWeight:"bold",fontSize:"18px",color:"white"}}>Trip Planner</h1><div style={{fontSize:"11px",color:"#94a3b8"}}>Welcome, {authUser.username} {authUser.role === "admin" && "(Admin)"} • Live Sync</div></div></div>
+        <div style={{display:"flex",gap:"4px",overflowX:"auto",paddingBottom:"4px"}}>{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{padding:"6px 14px",borderRadius:"8px",fontSize:"14px",whiteSpace:"nowrap",border:"none",background: activeTab === tab.id ? "#3b82f6" : "transparent",color: activeTab === tab.id ? "white" : "#94a3b8",cursor:"pointer"}}>{tab.label}</button>))}</div>
+      </div>
+      <div style={{padding:"20px",maxWidth:"1200px",margin:"0 auto"}}>{tabs.find(t => t.id === activeTab)?.component()}</div>
+      
+      {/* Modals - same as before but with updated handlers */}
+      {showExpenseModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowExpenseModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"85vh",overflow:"auto"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Expense</h3><button onClick={() => setShowExpenseModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><select value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option value={DAYS[0].date}>Day 1</option><option value={DAYS[1].date}>Day 2</option><option value={DAYS[2].date}>Day 3</option></select><input type="text" placeholder="Description" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="number" placeholder="Amount (₹)" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><select value={newExpense.paidBy} onChange={e => setNewExpense({...newExpense, paidBy: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option value="">Select who paid</option>{tripData.members?.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}</select><div><label>Split among:</label><div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginTop:"8px"}}>{tripData.members?.map(m => (<label key={m.id} style={{display:"flex",alignItems:"center",gap:"6px"}}><input type="checkbox" checked={newExpense.splitAmong.includes(m.name)} onChange={e => { const updated = e.target.checked ? [...newExpense.splitAmong, m.name] : newExpense.splitAmong.filter(n => n !== m.name); setNewExpense({...newExpense, splitAmong: updated}); }} /><span>{m.name}</span></label>))}</div></div><button onClick={addExpense} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Expense</button></div></div></div>)}
+      
+      {showPollModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowPollModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Create Poll</h3><button onClick={() => setShowPollModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Poll question" value={newPoll.question} onChange={e => setNewPoll({...newPoll, question: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} />{newPoll.options.map((opt, idx) => (<input key={idx} type="text" placeholder={`Option ${idx+1}`} value={opt} onChange={e => { const newOpts = [...newPoll.options]; newOpts[idx] = e.target.value; setNewPoll({...newPoll, options: newOpts}); }} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} />))}<button onClick={() => setNewPoll({...newPoll, options: [...newPoll.options, ""]})} style={{padding:"8px",background:"#475569",border:"none",borderRadius:"6px",color:"white"}}>+ Add Option</button><button onClick={addPoll} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Create Poll</button></div></div></div>)}
+      
+      {showMemberModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowMemberModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"400px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Member</h3><button onClick={() => setShowMemberModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Member name" value={newMember} onChange={e => setNewMember(e.target.value)} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addMember} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Member</button></div></div></div>)}
+      
+      {showActivityModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowActivityModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Activity</h3><button onClick={() => setShowActivityModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Time (e.g., 10:00)" value={newActivity.time} onChange={e => setNewActivity({...newActivity, time: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Activity title" value={newActivity.title} onChange={e => setNewActivity({...newActivity, title: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Location" value={newActivity.location} onChange={e => setNewActivity({...newActivity, location: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Notes (optional)" value={newActivity.notes} onChange={e => setNewActivity({...newActivity, notes: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addActivity} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Activity</button></div></div></div>)}
+      
+      {showPackingModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowPackingModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"400px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Packing Item</h3><button onClick={() => setShowPackingModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><select value={newPackingItem.category} onChange={e => setNewPackingItem({...newPackingItem, category: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option>Clothing</option><option>Toiletries</option><option>Electronics</option><option>Documents</option><option>Misc</option></select><input type="text" placeholder="Item name" value={newPackingItem.item} onChange={e => setNewPackingItem({...newPackingItem, item: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addPackingItem} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Item</button></div></div></div>)}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+
+</script>
+</body>
+</html>
