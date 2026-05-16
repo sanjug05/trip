@@ -46,69 +46,137 @@ const db = firebase.firestore();
 
 // ========== CONFIG ==========
 const VALID_USERS = [
-  { username: "Sanjug", password: "AIStrip@001", role: "admin", email: "sanjug@trip.com" },
+  { username: "Sanjug",  password: "AIStrip@001", role: "admin",  email: "sanjug@trip.com" },
   { username: "Manishk", password: "AIStrip@001", role: "member", email: "manishk@trip.com" },
-  { username: "Atikab", password: "AIStrip@001", role: "member", email: "atikab@trip.com" }
+  { username: "Atikab",  password: "AIStrip@001", role: "member", email: "atikab@trip.com" }
 ];
 
-const DAYS = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  label: `Day ${i + 1}`,
-  date: new Date(Date.now() + (i * 86400000)).toISOString().slice(0,10)
-}));
+// Trip start date - May 17 2026 (tomorrow); change as needed
+const TRIP_START = new Date("2026-05-17");
+const DAYS = Array.from({ length: 10 }, (_, i) => {
+  const d = new Date(TRIP_START);
+  d.setDate(d.getDate() + i);
+  const dateStr = d.toISOString().slice(0, 10);
+  return { id: i + 1, label: `Day ${i + 1}`, date: dateStr };
+});
 
 const TRIP_ID = "current_trip";
+const PACKING_CATEGORIES = ["Clothing", "Toiletries", "Electronics", "Documents", "Misc"];
 
 // ========== HELPERS ==========
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const fmt = (n) => {
+  if (isNaN(n)) return "0";
+  return Math.round(n).toLocaleString("en-IN");
+};
+
+// Sort activities by time string "HH:MM"
+const sortActivities = (acts) =>
+  [...acts].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
+// Calculate balances and settlement suggestions
 const calculateExpenseSummary = (expenses, members) => {
   const memberNames = members.map(m => m.name);
   let totalSpent = 0;
   const paidByUser = {};
   const sharePerUser = {};
   memberNames.forEach(name => { paidByUser[name] = 0; sharePerUser[name] = 0; });
-  expenses.forEach(exp => {
-    totalSpent += exp.amount;
-    paidByUser[exp.paidBy] = (paidByUser[exp.paidBy] || 0) + exp.amount;
-    const perPersonShare = exp.amount / exp.splitAmong.length;
-    exp.splitAmong.forEach(person => { sharePerUser[person] = (sharePerUser[person] || 0) + perPersonShare; });
+
+  (expenses || []).forEach(exp => {
+    const amount = parseFloat(exp.amount) || 0;
+    totalSpent += amount;
+    paidByUser[exp.paidBy] = (paidByUser[exp.paidBy] || 0) + amount;
+    const among = exp.splitAmong && exp.splitAmong.length > 0 ? exp.splitAmong : memberNames;
+    const perPersonShare = amount / among.length;
+    among.forEach(person => {
+      sharePerUser[person] = (sharePerUser[person] || 0) + perPersonShare;
+    });
   });
+
+  // balance > 0 means person is owed money; < 0 means person owes money
   const balance = {};
-  memberNames.forEach(name => { balance[name] = paidByUser[name] - sharePerUser[name]; });
-  return { totalSpent, avgPerPerson: totalSpent / memberNames.length, paidByUser, sharePerUser, balance };
+  memberNames.forEach(name => {
+    balance[name] = (paidByUser[name] || 0) - (sharePerUser[name] || 0);
+  });
+
+  // Build settlement suggestions: who pays whom
+  const settlements = [];
+  const debtors = memberNames
+    .filter(n => balance[n] < -0.01)
+    .map(n => ({ name: n, amount: -balance[n] }))
+    .sort((a, b) => b.amount - a.amount);
+  const creditors = memberNames
+    .filter(n => balance[n] > 0.01)
+    .map(n => ({ name: n, amount: balance[n] }))
+    .sort((a, b) => b.amount - a.amount);
+
+  let di = 0, ci = 0;
+  while (di < debtors.length && ci < creditors.length) {
+    const pay = Math.min(debtors[di].amount, creditors[ci].amount);
+    if (pay > 0.01) {
+      settlements.push({
+        from: debtors[di].name,
+        to: creditors[ci].name,
+        amount: pay
+      });
+    }
+    debtors[di].amount -= pay;
+    creditors[ci].amount -= pay;
+    if (debtors[di].amount < 0.01) di++;
+    if (creditors[ci].amount < 0.01) ci++;
+  }
+
+  return {
+    totalSpent,
+    avgPerPerson: memberNames.length > 0 ? totalSpent / memberNames.length : 0,
+    paidByUser,
+    sharePerUser,
+    balance,
+    settlements
+  };
 };
 
 // ========== LOGIN PAGE ==========
 const LoginPage = ({ onLogin }) => {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [error, setError] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  const [error, setError]       = React.useState("");
+  const [loading, setLoading]   = React.useState(false);
 
-    const handleSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     const user = VALID_USERS.find(u => u.username === username && u.password === password);
     if (user) {
       setLoading(true);
-      // Just store in localStorage, no Firebase Auth
       localStorage.setItem("trip_auth", JSON.stringify({ username: user.username, role: user.role }));
       onLogin({ username: user.username, role: user.role });
-      // DON'T setLoading(false) here - let the app handle it
     } else {
       setError("Invalid username or password");
     }
   };
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:"rgba(30,41,59,0.9)",backdropFilter:"blur(10px)",borderRadius:"24px",padding:"32px",width:"100%",maxWidth:"400px",border:"1px solid #334155"}}>
-        <div style={{textAlign:"center",marginBottom:"24px"}}><div style={{fontSize:"48px",marginBottom:"8px"}}>✈️</div><h1 style={{fontSize:"24px",fontWeight:"bold",color:"white"}}>Trip Planner</h1><p style={{color:"#94a3b8",fontSize:"14px",marginTop:"4px"}}>Group travel companion • Live Sync</p></div>
+        <div style={{textAlign:"center",marginBottom:"24px"}}>
+          <div style={{fontSize:"48px",marginBottom:"8px"}}>✈️</div>
+          <h1 style={{fontSize:"24px",fontWeight:"bold",color:"white"}}>Trip Planner</h1>
+          <p style={{color:"#94a3b8",fontSize:"14px",marginTop:"4px"}}>Group travel companion • Live Sync</p>
+        </div>
         <form onSubmit={handleSubmit}>
-          <div style={{marginBottom:"16px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter username" style={{width:"100%",padding:"10px",borderRadius:"8px",border:"1px solid #334155",background:"#1e293b",color:"white"}} /></div>
-          <div style={{marginBottom:"20px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" style={{width:"100%",padding:"10px",borderRadius:"8px",border:"1px solid #334155",background:"#1e293b",color:"white"}} /></div>
+          <div style={{marginBottom:"16px"}}>
+            <label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Username</label>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Enter username" style={{width:"100%"}} />
+          </div>
+          <div style={{marginBottom:"20px"}}>
+            <label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter password" style={{width:"100%"}} />
+          </div>
           {error && <div style={{marginBottom:"16px",color:"#ef4444",fontSize:"14px",textAlign:"center"}}>{error}</div>}
-          <button type="submit" disabled={loading} style={{width:"100%",padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",fontSize:"16px",opacity:loading?0.7:1}}>{loading ? "Loading..." : "Sign In"}</button>
+          <button type="submit" disabled={loading} style={{width:"100%",padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",fontSize:"16px",opacity:loading?0.7:1}}>
+            {loading ? "Loading..." : "Sign In"}
+          </button>
         </form>
         <div style={{marginTop:"20px",textAlign:"center",fontSize:"11px",color:"#64748b"}}>Live sync via Firebase • Changes visible to all</div>
       </div>
@@ -116,353 +184,916 @@ const LoginPage = ({ onLogin }) => {
   );
 };
 
+// ========== EDIT MODAL (generic) ==========
+const EditModal = ({ title, fields, values, onChange, onSave, onClose }) => (
+  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={onClose}>
+    <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e => e.stopPropagation()}>
+      <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <h3 style={{fontWeight:"bold"}}>{title}</h3>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
+      </div>
+      <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}>
+        {fields.map(f => {
+          if (f.type === "select") return (
+            <div key={f.key}>
+              {f.label && <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
+              <select value={values[f.key] || ""} onChange={e => onChange(f.key, e.target.value)} style={{width:"100%"}}>
+                {(f.options || []).map(opt => <option key={opt.value || opt} value={opt.value || opt}>{opt.label || opt}</option>)}
+              </select>
+            </div>
+          );
+          if (f.type === "checkboxGroup") return (
+            <div key={f.key}>
+              <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"6px"}}>{f.label}</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+                {(f.options || []).map(opt => (
+                  <label key={opt} style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
+                    <input type="checkbox"
+                      checked={(values[f.key] || []).includes(opt)}
+                      onChange={e => {
+                        const arr = values[f.key] || [];
+                        onChange(f.key, e.target.checked ? [...arr, opt] : arr.filter(x => x !== opt));
+                      }}
+                    />
+                    <span style={{fontSize:"14px"}}>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+          return (
+            <div key={f.key}>
+              {f.label && <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
+              <input
+                type={f.inputType || "text"}
+                placeholder={f.placeholder || f.label || ""}
+                value={values[f.key] || ""}
+                onChange={e => onChange(f.key, e.target.value)}
+                style={{width:"100%"}}
+              />
+            </div>
+          );
+        })}
+        <button onClick={onSave} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",marginTop:"4px"}}>
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 // ========== MAIN APP ==========
 const App = () => {
   const [authUser, setAuthUser] = React.useState(null);
   const [tripData, setTripData] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [loading,  setLoading]  = React.useState(true);
   const [activeTab, setActiveTab] = React.useState("dashboard");
   const [activeDay, setActiveDay] = React.useState(1);
-  
-  // Modal states
-  const [showExpenseModal, setShowExpenseModal] = React.useState(false);
-  const [showPollModal, setShowPollModal] = React.useState(false);
-  const [showMemberModal, setShowMemberModal] = React.useState(false);
-  const [showActivityModal, setShowActivityModal] = React.useState(false);
-  const [showPackingModal, setShowPackingModal] = React.useState(false);
-  const [activityDayId, setActivityDayId] = React.useState(1);
-  
-  // Form states
-  const [newExpense, setNewExpense] = React.useState({ date: DAYS[0].date, description: "", amount: "", paidBy: "", splitAmong: [] });
-  const [newPoll, setNewPoll] = React.useState({ question: "", options: ["", ""] });
-  const [newMember, setNewMember] = React.useState("");
-  const [newActivity, setNewActivity] = React.useState({ time: "12:00", title: "", location: "", notes: "" });
-  const [newPackingItem, setNewPackingItem] = React.useState({ category: "Clothing", item: "" });
   const [isSyncing, setIsSyncing] = React.useState(false);
 
-  // Default trip data
+  // Modal / edit states
+  const [modal, setModal] = React.useState(null); // { type, data }
+  const [editForm, setEditForm] = React.useState({});
+
+  // ---- Default data ----
   const getDefaultTripData = () => ({
     members: [
-      { id: "m1", name: "Sanjug", isAdmin: true },
+      { id: "m1", name: "Sanjug",  isAdmin: true  },
       { id: "m2", name: "Manishk", isAdmin: false },
-      { id: "m3", name: "Atikab", isAdmin: false }
+      { id: "m3", name: "Atikab",  isAdmin: false }
     ],
     itinerary: DAYS.map(day => ({
       dayId: day.id,
       date: day.date,
-      activities: [
-        { id: generateId(), time: "09:00", title: "Breakfast", location: "Hotel", notes: "" },
-        { id: generateId(), time: "11:00", title: "Visit local market", location: "City Center", notes: "" },
-        { id: generateId(), time: "15:00", title: "Lunch", location: "Local Restaurant", notes: "" },
-        { id: generateId(), time: "18:00", title: "Sunset point", location: "Viewpoint", notes: "" }
-      ]
+      activities: sortActivities([
+        { id: generateId(), time: "09:00", title: "Breakfast",         location: "Hotel",             notes: "" },
+        { id: generateId(), time: "11:00", title: "Visit local market",location: "City Center",       notes: "" },
+        { id: generateId(), time: "15:00", title: "Lunch",             location: "Local Restaurant",  notes: "" },
+        { id: generateId(), time: "18:00", title: "Sunset point",      location: "Viewpoint",         notes: "" }
+      ])
     })),
     packingList: [
-      { id: generateId(), category: "Clothing", item: "T-shirts (3)", checked: false, assignedTo: null },
-      { id: generateId(), category: "Clothing", item: "Jeans/Shorts", checked: false, assignedTo: null },
-      { id: generateId(), category: "Clothing", item: "Jacket/Sweater", checked: false, assignedTo: null },
-      { id: generateId(), category: "Clothing", item: "Underwear & Socks", checked: false, assignedTo: null },
-      { id: generateId(), category: "Toiletries", item: "Toothbrush & Paste", checked: false, assignedTo: null },
-      { id: generateId(), category: "Toiletries", item: "Shampoo & Soap", checked: false, assignedTo: null },
-      { id: generateId(), category: "Toiletries", item: "Sunscreen", checked: false, assignedTo: null },
-      { id: generateId(), category: "Electronics", item: "Phone charger", checked: false, assignedTo: null },
-      { id: generateId(), category: "Electronics", item: "Power bank", checked: false, assignedTo: null },
-      { id: generateId(), category: "Documents", item: "ID proof", checked: false, assignedTo: null },
-      { id: generateId(), category: "Misc", item: "First aid kit", checked: false, assignedTo: null },
-      { id: generateId(), category: "Misc", item: "Snacks", checked: false, assignedTo: null }
+      { id: generateId(), category:"Clothing",    item:"T-shirts (3)",       checked:false, assignedTo:null },
+      { id: generateId(), category:"Clothing",    item:"Jeans/Shorts",       checked:false, assignedTo:null },
+      { id: generateId(), category:"Clothing",    item:"Jacket/Sweater",     checked:false, assignedTo:null },
+      { id: generateId(), category:"Clothing",    item:"Underwear & Socks",  checked:false, assignedTo:null },
+      { id: generateId(), category:"Toiletries",  item:"Toothbrush & Paste", checked:false, assignedTo:null },
+      { id: generateId(), category:"Toiletries",  item:"Shampoo & Soap",     checked:false, assignedTo:null },
+      { id: generateId(), category:"Toiletries",  item:"Sunscreen",          checked:false, assignedTo:null },
+      { id: generateId(), category:"Electronics", item:"Phone charger",      checked:false, assignedTo:null },
+      { id: generateId(), category:"Electronics", item:"Power bank",         checked:false, assignedTo:null },
+      { id: generateId(), category:"Documents",   item:"ID proof",           checked:false, assignedTo:null },
+      { id: generateId(), category:"Misc",        item:"First aid kit",      checked:false, assignedTo:null },
+      { id: generateId(), category:"Misc",        item:"Snacks",             checked:false, assignedTo:null }
     ],
     expenses: [
-      { id: generateId(), date: DAYS[0].date, description: "Hotel booking", amount: 15000, paidBy: "Sanjug", splitAmong: ["Sanjug", "Manishk", "Atikab"] },
-      { id: generateId(), date: DAYS[0].date, description: "Dinner", amount: 2400, paidBy: "Manishk", splitAmong: ["Sanjug", "Manishk", "Atikab"] },
-      { id: generateId(), date: DAYS[1].date, description: "Taxi fare", amount: 1200, paidBy: "Atikab", splitAmong: ["Sanjug", "Manishk", "Atikab"] }
+      { id:generateId(), date:DAYS[0].date, description:"Hotel booking", amount:15000, paidBy:"Sanjug",  splitAmong:["Sanjug","Manishk","Atikab"] },
+      { id:generateId(), date:DAYS[0].date, description:"Dinner",        amount:2400,  paidBy:"Manishk", splitAmong:["Sanjug","Manishk","Atikab"] },
+      { id:generateId(), date:DAYS[1].date, description:"Taxi fare",     amount:1200,  paidBy:"Atikab",  splitAmong:["Sanjug","Manishk","Atikab"] }
     ],
     polls: [
-      { id: generateId(), question: "Where should we have dinner on Day 2?", options: ["Indian restaurant", "Italian place", "Street food"], votes: { "Indian restaurant": 2, "Italian place": 1, "Street food": 0 }, createdBy: "Sanjug" }
+      { id:generateId(), question:"Where should we have dinner on Day 2?", options:["Indian restaurant","Italian place","Street food"], votes:{"Indian restaurant":2,"Italian place":1,"Street food":0}, createdBy:"Sanjug" }
     ]
   });
 
-  // Load data from Firestore
-  // Load data from Firestore (no auth check)
-  // Load data from Firestore (runs once on mount)
+  // ---- One-time load on mount ----
   React.useEffect(() => {
-    const loadData = async () => {
-      const savedAuth = localStorage.getItem("trip_auth");
-      if (savedAuth) {
-        const user = JSON.parse(savedAuth);
-        setAuthUser(user);
-        
-        try {
-          const docRef = db.collection("trips").doc(TRIP_ID);
-          const doc = await docRef.get();
-          if (doc.exists) {
-            setTripData(doc.data());
-          } else {
-            const defaultData = getDefaultTripData();
-            await docRef.set(defaultData);
-            setTripData(defaultData);
-          }
-        } catch (error) {
-          console.error("Firestore error:", error);
-        }
-      }
+    const savedAuth = localStorage.getItem("trip_auth");
+    if (savedAuth) {
+      const user = JSON.parse(savedAuth);
+      setAuthUser(user);
+      // Data will be loaded by the authUser effect below
+    } else {
       setLoading(false);
-    };
-    loadData();
+    }
   }, []);
 
-  // Load trip data when authUser changes (after login)
-   // Load trip data when authUser changes (after login)
+  // ---- Load + subscribe when authUser is set ----
   React.useEffect(() => {
     if (!authUser) return;
-    
-    const loadTripData = async () => {
+
+    const docRef = db.collection("trips").doc(TRIP_ID);
+    let unsubscribe = null;
+
+    const init = async () => {
       try {
-        const docRef = db.collection("trips").doc(TRIP_ID);
         const doc = await docRef.get();
-        if (doc.exists) {
-          setTripData(doc.data());
-        } else {
+        if (!doc.exists) {
           const defaultData = getDefaultTripData();
           await docRef.set(defaultData);
-          setTripData(defaultData);
         }
-      } catch (error) {
-        console.error("Firestore error:", error);
+      } catch (err) {
+        console.error("Init error:", err);
       } finally {
-        setLoading(false);
+        // Now subscribe for real-time updates
+        unsubscribe = docRef.onSnapshot(snap => {
+          if (snap.exists) setTripData(snap.data());
+          setLoading(false);
+        }, err => {
+          console.error("Snapshot error:", err);
+          setLoading(false);
+        });
       }
     };
-    loadTripData();
+
+    init();
+    return () => unsubscribe && unsubscribe();
   }, [authUser]);
 
-  // Listen for real-time updates after login
-  React.useEffect(() => {
-    if (!authUser || !tripData) return;
-    
-    const unsubscribe = db.collection("trips").doc(TRIP_ID)
-      .onSnapshot((doc) => {
-        if (doc.exists) {
-          setTripData(doc.data());
-        }
-      }, (error) => {
-        console.error("Firestore error:", error);
-      });
-    return () => unsubscribe();
-  }, [authUser]);
-
-  // Update Firestore
+  // ---- Write helper ----
   const updateTripData = async (newData) => {
-    if (!authUser) return;
     setIsSyncing(true);
     try {
       await db.collection("trips").doc(TRIP_ID).set(newData);
-      // Don't set local state here - it will update via onSnapshot
-    } catch (error) {
-      console.error("Update error:", error);
+      // onSnapshot will update state
+    } catch (err) {
+      console.error("Update error:", err);
       alert("Failed to save. Please check your connection.");
     } finally {
       setIsSyncing(false);
     }
   };
 
+  // ---- Auth ----
   const handleLogout = () => {
-  localStorage.removeItem("trip_auth");
-  setAuthUser(null);
-  setTripData(null);
-};
-  
+    localStorage.removeItem("trip_auth");
+    setAuthUser(null);
+    setTripData(null);
+    setLoading(false);
+  };
+
+  // ---- Loading / auth guards ----
   if (loading) {
     return (
-      <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}>
         <div className="loading-spinner" style={{width:"40px",height:"40px"}}></div>
       </div>
     );
   }
-  
-  if (!authUser || !tripData) return <LoginPage onLogin={(user) => {
-    setAuthUser(user);
-    setLoading(true);
-  }} />;
-  
+
+  if (!authUser) return <LoginPage onLogin={user => { setAuthUser(user); setLoading(true); }} />;
+
+  if (!tripData) {
+    return (
+      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
+        <div className="loading-spinner" style={{width:"40px",height:"40px"}}></div>
+        <div style={{color:"#94a3b8",fontSize:"14px"}}>Loading trip data…</div>
+      </div>
+    );
+  }
+
+  // ---- Derived ----
   const isAdmin = authUser.role === "admin";
+  const memberNames = (tripData.members || []).map(m => m.name);
   const expenseSummary = calculateExpenseSummary(tripData.expenses || [], tripData.members || []);
   const currentDay = DAYS.find(d => d.id === activeDay);
-  
-  // Add functions
-  const addExpense = () => {
-    if (!newExpense.description || !newExpense.amount || !newExpense.paidBy || newExpense.splitAmong.length === 0) {
-      alert("Please fill all fields");
+
+  // ---- Open modal helpers ----
+  const openModal = (type, initialData = {}) => {
+    setEditForm(initialData);
+    setModal({ type });
+  };
+  const closeModal = () => { setModal(null); setEditForm({}); };
+  const setField = (key, val) => setEditForm(prev => ({ ...prev, [key]: val }));
+
+  // =========================================================
+  // ADD / EDIT / DELETE ACTIONS
+  // =========================================================
+
+  // --- Expenses ---
+  const saveExpense = () => {
+    const { _editId, date, description, amount, paidBy, splitAmong } = editForm;
+    if (!description || !amount || !paidBy || !splitAmong || splitAmong.length === 0) {
+      alert("Please fill all fields and select at least one person to split among.");
       return;
     }
-    const expense = { id: generateId(), date: newExpense.date, description: newExpense.description, amount: parseFloat(newExpense.amount), paidBy: newExpense.paidBy, splitAmong: newExpense.splitAmong };
-    updateTripData({ ...tripData, expenses: [...(tripData.expenses || []), expense] });
-    setShowExpenseModal(false);
-    setNewExpense({ date: DAYS[0].date, description: "", amount: "", paidBy: tripData.members[0]?.name || "", splitAmong: tripData.members.map(m => m.name) });
+    const record = { id: _editId || generateId(), date: date || DAYS[0].date, description, amount: parseFloat(amount), paidBy, splitAmong };
+    const expenses = _editId
+      ? (tripData.expenses || []).map(e => e.id === _editId ? record : e)
+      : [...(tripData.expenses || []), record];
+    updateTripData({ ...tripData, expenses });
+    closeModal();
   };
-  
-  const addPoll = () => {
-    if (!newPoll.question || newPoll.options.some(o => !o.trim())) { alert("Please fill poll question and all options"); return; }
-    const poll = { id: generateId(), question: newPoll.question, options: newPoll.options.filter(o => o.trim()), votes: {}, createdBy: authUser.username };
-    poll.options.forEach(opt => { poll.votes[opt] = 0; });
-    updateTripData({ ...tripData, polls: [...(tripData.polls || []), poll] });
-    setShowPollModal(false);
-    setNewPoll({ question: "", options: ["", ""] });
-  };
-  
-  const addMember = () => {
-    if (!newMember.trim()) { alert("Please enter member name"); return; }
-    if (tripData.members.length >= 10) { alert("Maximum 10 members allowed"); return; }
-    updateTripData({ ...tripData, members: [...tripData.members, { id: generateId(), name: newMember.trim(), isAdmin: false }] });
-    setShowMemberModal(false);
-    setNewMember("");
-  };
-  
-  const addActivity = () => {
-    if (!newActivity.title) { alert("Please enter activity title"); return; }
-    const act = { id: generateId(), time: newActivity.time, title: newActivity.title, location: newActivity.location, notes: newActivity.notes };
-    const updatedItinerary = tripData.itinerary.map(d => d.dayId === activityDayId ? { ...d, activities: [...d.activities, act] } : d);
+
+  const deleteExpense = id => updateTripData({ ...tripData, expenses: tripData.expenses.filter(e => e.id !== id) });
+
+  // --- Activities ---
+  const saveActivity = () => {
+    const { _editId, _dayId, time, title, location, notes } = editForm;
+    if (!title) { alert("Please enter activity title"); return; }
+    const dayId = _dayId;
+    const record = { id: _editId || generateId(), time: time || "12:00", title, location: location || "", notes: notes || "" };
+    const updatedItinerary = (tripData.itinerary || []).map(d =>
+      d.dayId === dayId
+        ? { ...d, activities: sortActivities(_editId ? d.activities.map(a => a.id === _editId ? record : a) : [...d.activities, record]) }
+        : d
+    );
     updateTripData({ ...tripData, itinerary: updatedItinerary });
-    setShowActivityModal(false);
-    setNewActivity({ time: "12:00", title: "", location: "", notes: "" });
+    closeModal();
   };
-  
-  const addPackingItem = () => {
-    if (!newPackingItem.item) { alert("Please enter item name"); return; }
-    updateTripData({ ...tripData, packingList: [...(tripData.packingList || []), { id: generateId(), category: newPackingItem.category, item: newPackingItem.item, checked: false, assignedTo: null }] });
-    setShowPackingModal(false);
-    setNewPackingItem({ category: "Clothing", item: "" });
-  };
-  
-  // Delete functions
-  const deleteExpense = (id) => updateTripData({ ...tripData, expenses: tripData.expenses.filter(e => e.id !== id) });
-  const deletePoll = (id) => updateTripData({ ...tripData, polls: tripData.polls.filter(p => p.id !== id) });
-  const deleteMember = (id) => { if (tripData.members.length <= 1) { alert("At least one member required"); return; } updateTripData({ ...tripData, members: tripData.members.filter(m => m.id !== id) }); };
-  const deleteActivity = (dayId, activityId) => {
-    const updatedItinerary = tripData.itinerary.map(d => d.dayId === dayId ? { ...d, activities: d.activities.filter(a => a.id !== activityId) } : d);
+
+  const deleteActivity = (dayId, actId) => {
+    const updatedItinerary = (tripData.itinerary || []).map(d =>
+      d.dayId === dayId ? { ...d, activities: d.activities.filter(a => a.id !== actId) } : d
+    );
     updateTripData({ ...tripData, itinerary: updatedItinerary });
   };
-  const deletePackingItem = (id) => updateTripData({ ...tripData, packingList: tripData.packingList.filter(i => i.id !== id) });
-  const togglePackingItem = (id) => {
-    const updated = tripData.packingList.map(i => i.id === id ? { ...i, checked: !i.checked } : i);
+
+  // --- Packing ---
+  const savePackingItem = () => {
+    const { _editId, category, item } = editForm;
+    if (!item) { alert("Please enter item name"); return; }
+    const record = _editId
+      ? { ...(tripData.packingList || []).find(i => i.id === _editId), category, item }
+      : { id: generateId(), category: category || "Clothing", item, checked: false, assignedTo: null };
+    const packingList = _editId
+      ? (tripData.packingList || []).map(i => i.id === _editId ? record : i)
+      : [...(tripData.packingList || []), record];
+    updateTripData({ ...tripData, packingList });
+    closeModal();
+  };
+
+  const deletePackingItem = id => updateTripData({ ...tripData, packingList: (tripData.packingList || []).filter(i => i.id !== id) });
+  const togglePackingItem = id => {
+    const updated = (tripData.packingList || []).map(i => i.id === id ? { ...i, checked: !i.checked } : i);
     updateTripData({ ...tripData, packingList: updated });
   };
+
+  // --- Polls ---
+  const savePoll = () => {
+    const { question, options } = editForm;
+    const cleanOpts = (options || []).filter(o => o.trim());
+    if (!question || cleanOpts.length < 2) { alert("Enter a question and at least 2 options"); return; }
+    const votes = {};
+    cleanOpts.forEach(o => { votes[o] = 0; });
+    const poll = { id: generateId(), question, options: cleanOpts, votes, createdBy: authUser.username };
+    updateTripData({ ...tripData, polls: [...(tripData.polls || []), poll] });
+    closeModal();
+  };
+
+  const deletePoll = id => updateTripData({ ...tripData, polls: (tripData.polls || []).filter(p => p.id !== id) });
   const votePoll = (pollId, option) => {
-    const updated = tripData.polls.map(p => p.id === pollId ? { ...p, votes: { ...p.votes, [option]: (p.votes[option] || 0) + 1 } } : p);
+    const updated = (tripData.polls || []).map(p =>
+      p.id === pollId ? { ...p, votes: { ...p.votes, [option]: (p.votes[option] || 0) + 1 } } : p
+    );
     updateTripData({ ...tripData, polls: updated });
   };
-  const resetToDefault = () => { if(confirm("Reset all data to default?")) updateTripData(getDefaultTripData()); };
-  
-  // Render functions (same as before but using tripData)
+
+  // --- Members ---
+  const saveMember = () => {
+    const { name } = editForm;
+    if (!name || !name.trim()) { alert("Please enter member name"); return; }
+    if ((tripData.members || []).length >= 10) { alert("Maximum 10 members allowed"); return; }
+    updateTripData({ ...tripData, members: [...(tripData.members || []), { id: generateId(), name: name.trim(), isAdmin: false }] });
+    closeModal();
+  };
+
+  const deleteMember = id => {
+    if ((tripData.members || []).length <= 1) { alert("At least one member required"); return; }
+    updateTripData({ ...tripData, members: (tripData.members || []).filter(m => m.id !== id) });
+  };
+
+  const resetToDefault = () => {
+    if (window.confirm("Reset ALL trip data to defaults? This cannot be undone.")) updateTripData(getDefaultTripData());
+  };
+
+  // =========================================================
+  // RENDER TABS
+  // =========================================================
+
+  const SyncBanner = () => isSyncing ? (
+    <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6",padding:"4px",background:"rgba(59,130,246,0.1)",borderRadius:"6px",marginBottom:"8px"}}>
+      ⏳ Syncing changes…
+    </div>
+  ) : null;
+
+  // ---- DASHBOARD ----
   const renderDashboard = () => {
-    const packedItems = tripData.packingList?.filter(i => i.checked).length || 0;
-    const upcomingActivities = tripData.itinerary?.flatMap(day => day.activities.map(a => ({ ...a, dayId: day.dayId }))).slice(0, 5) || [];
+    const packedItems = (tripData.packingList || []).filter(i => i.checked).length;
+    const totalItems  = (tripData.packingList || []).length;
+    const upcomingActs = (tripData.itinerary || [])
+      .flatMap(d => (d.activities || []).map(a => ({ ...a, dayId: d.dayId })))
+      .slice(0, 6);
+
     return (
       <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
-        {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"12px"}}>
-          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#3b82f6"}}>{tripData.members?.length || 0}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Members</div></div>
-          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#10b981"}}>₹{expenseSummary.totalSpent.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Total Spent</div></div>
-          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#f59e0b"}}>₹{expenseSummary.avgPerPerson.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Avg/Person</div></div>
-          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}><div style={{fontSize:"28px",fontWeight:"bold",color:"#a78bfa"}}>{packedItems}/{tripData.packingList?.length || 0}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Packed</div></div>
+        <SyncBanner />
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
+          {[
+            { label:"Members",    value: tripData.members?.length || 0,       color:"#3b82f6" },
+            { label:"Total Spent",value:`₹${fmt(expenseSummary.totalSpent)}`, color:"#10b981" },
+            { label:"Avg/Person", value:`₹${fmt(expenseSummary.avgPerPerson)}`,color:"#f59e0b" },
+            { label:"Packed",     value:`${packedItems}/${totalItems}`,        color:"#a78bfa" }
+          ].map(c => (
+            <div key={c.label} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}>
+              <div style={{fontSize:"26px",fontWeight:"bold",color:c.color}}>{c.value}</div>
+              <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>{c.label}</div>
+            </div>
+          ))}
         </div>
-        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>📋 Upcoming Activities</h3>{upcomingActivities.length === 0 && <div style={{color:"#64748b",textAlign:"center",padding:"20px"}}>No activities planned</div>}{upcomingActivities.map((act, idx) => (<div key={idx} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}><span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace"}}>{act.time}</span><span>{act.title}</span><span style={{marginLeft:"auto",fontSize:"11px",color:"#64748b"}}>Day {act.dayId}</span></div>))}</div>
-        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>💰 Who Owes Whom</h3>{tripData.members?.map(member => { const bal = expenseSummary.balance[member.name]; return (<div key={member.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}><span>{member.name} {member.isAdmin && <span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"4px"}}>(Admin)</span>}</span><span style={{color: bal > 0 ? "#10b981" : bal < 0 ? "#ef4444" : "#94a3b8"}}>{bal > 0 ? `+₹${bal.toFixed(0)}` : bal < 0 ? `-₹${Math.abs(bal).toFixed(0)}` : '₹0'}</span></div>);})}</div>
+
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📋 Upcoming Activities</h3>
+          {upcomingActs.length === 0
+            ? <div style={{color:"#64748b",textAlign:"center",padding:"20px"}}>No activities planned</div>
+            : upcomingActs.map((act, i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+                <span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace",minWidth:"48px"}}>{act.time}</span>
+                <span style={{flex:1}}>{act.title}</span>
+                {act.location && <span style={{fontSize:"11px",color:"#94a3b8"}}>{act.location}</span>}
+                <span style={{fontSize:"11px",color:"#64748b",marginLeft:"4px"}}>Day {act.dayId}</span>
+              </div>
+            ))
+          }
+        </div>
+
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💰 Balance Summary</h3>
+          {(tripData.members || []).map(m => {
+            const bal = expenseSummary.balance[m.name] || 0;
+            return (
+              <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}>
+                <span>{m.name}{m.isAdmin && <span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"4px"}}>(Admin)</span>}</span>
+                <span style={{color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8",fontWeight:"600"}}>
+                  {bal > 0.01 ? `+₹${fmt(bal)}` : bal < -0.01 ? `-₹${fmt(Math.abs(bal))}` : "₹0 (settled)"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {expenseSummary.settlements.length > 0 && (
+          <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #10b981"}}>
+            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Suggestions</h3>
+            {expenseSummary.settlements.map((s, i) => (
+              <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px"}}>
+                <span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span>
+                <span style={{color:"#64748b"}}>→ pays</span>
+                <span style={{color:"#10b981",fontWeight:"600"}}>₹{fmt(s.amount)}</span>
+                <span style={{color:"#64748b"}}>→ to</span>
+                <span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
-  
-  const renderItinerary = () => (
-    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-      <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"8px"}}>{DAYS.map(day => (<button key={day.id} onClick={() => setActiveDay(day.id)} style={{padding:"8px 16px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background: activeDay === day.id ? "#3b82f6" : "#1e293b",color:"white",cursor:"pointer"}}>{day.label} <span style={{fontSize:"11px",opacity:0.7}}>{day.date.slice(5)}</span></button>))}</div>
-      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}><h3 style={{fontWeight:"600"}}>Activities for {currentDay?.label}</h3>{isAdmin && <button onClick={() => { setActivityDayId(activeDay); setShowActivityModal(true); }} style={{padding:"6px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>+ Add</button>}</div>
-        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>{tripData.itinerary?.find(d => d.dayId === activeDay)?.activities.map(act => (<div key={act.id} style={{display:"flex",alignItems:"flex-start",gap:"12px",background:"#0f172a",padding:"12px",borderRadius:"8px"}}><div style={{color:"#3b82f6",fontFamily:"monospace",fontSize:"13px",minWidth:"60px"}}>{act.time}</div><div style={{flex:1}}><div style={{fontWeight:"500"}}>{act.title}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>{act.location}</div><div style={{fontSize:"11px",color:"#64748b",marginTop:"4px"}}>{act.notes}</div></div>{isAdmin && <button onClick={() => deleteActivity(activeDay, act.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"18px",cursor:"pointer"}}>🗑️</button>}</div>))}{tripData.itinerary?.find(d => d.dayId === activeDay)?.activities.length === 0 && <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No activities planned for this day</div>}</div>
+
+  // ---- ITINERARY ----
+  const renderItinerary = () => {
+    const dayData = (tripData.itinerary || []).find(d => d.dayId === activeDay);
+    const activities = sortActivities(dayData?.activities || []);
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner />
+        <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"8px"}}>
+          {DAYS.map(day => (
+            <button key={day.id} onClick={() => setActiveDay(day.id)}
+              style={{padding:"8px 14px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background: activeDay===day.id?"#3b82f6":"#1e293b",color:"white",cursor:"pointer",fontSize:"13px"}}>
+              {day.label} <span style={{fontSize:"11px",opacity:0.7}}>{day.date.slice(5)}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+            <h3 style={{fontWeight:"600"}}>Activities for {currentDay?.label} <span style={{fontSize:"12px",color:"#64748b"}}>({currentDay?.date})</span></h3>
+            {isAdmin && (
+              <button onClick={() => openModal("activity", { _dayId: activeDay, time:"09:00", title:"", location:"", notes:"" })}
+                style={{padding:"6px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>
+                + Add
+              </button>
+            )}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+            {activities.length === 0
+              ? <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No activities planned for this day</div>
+              : activities.map(act => (
+                <div key={act.id} style={{display:"flex",alignItems:"flex-start",gap:"12px",background:"#0f172a",padding:"12px",borderRadius:"8px"}}>
+                  <div style={{color:"#3b82f6",fontFamily:"monospace",fontSize:"13px",minWidth:"52px",paddingTop:"2px"}}>{act.time}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:"500"}}>{act.title}</div>
+                    {act.location && <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"2px"}}>📍 {act.location}</div>}
+                    {act.notes && <div style={{fontSize:"11px",color:"#64748b",marginTop:"4px"}}>{act.notes}</div>}
+                  </div>
+                  {isAdmin && (
+                    <div style={{display:"flex",gap:"6px",flexShrink:0}}>
+                      <button onClick={() => openModal("activity", { _editId:act.id, _dayId:activeDay, time:act.time, title:act.title, location:act.location||"", notes:act.notes||"" })}
+                        style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
+                      <button onClick={() => deleteActivity(activeDay, act.id)}
+                        style={{background:"none",border:"none",color:"#ef4444",fontSize:"16px",padding:"2px"}}>🗑️</button>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </div>
       </div>
-    </div>
-  );
-  
-  const renderPacking = () => {
-    const categories = [...new Set(tripData.packingList?.map(p => p.category) || [])];
-    return (<div style={{display:"flex",flexDirection:"column",gap:"16px"}}>{isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}{isAdmin && <button onClick={() => setShowPackingModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Packing Item</button>}{categories.map(cat => (<div key={cat} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>{cat}</h3><div style={{display:"flex",flexDirection:"column",gap:"8px"}}>{tripData.packingList?.filter(i => i.category === cat).map(item => (<div key={item.id} style={{display:"flex",alignItems:"center",gap:"12px"}}><input type="checkbox" checked={item.checked} onChange={() => togglePackingItem(item.id)} style={{width:"18px",height:"18px"}} /><span style={{flex:1,textDecoration: item.checked ? "line-through" : "none",color: item.checked ? "#64748b" : "white"}}>{item.item}</span>{isAdmin && <button onClick={() => deletePackingItem(item.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer"}}>🗑️</button>}</div>))}</div></div>))}</div>);
+    );
   };
-  
+
+  // ---- PACKING ----
+  const renderPacking = () => {
+    const categories = PACKING_CATEGORIES.filter(cat =>
+      (tripData.packingList || []).some(i => i.category === cat)
+    );
+    const allCategories = [...new Set([...categories, ...PACKING_CATEGORIES])];
+    const packedCount = (tripData.packingList || []).filter(i => i.checked).length;
+    const total = (tripData.packingList || []).length;
+    const pct = total > 0 ? Math.round((packedCount / total) * 100) : 0;
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner />
+
+        {/* Progress */}
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+            <span style={{fontWeight:"600"}}>Packing Progress</span>
+            <span style={{color:"#a78bfa",fontWeight:"600"}}>{packedCount}/{total} ({pct}%)</span>
+          </div>
+          <div style={{background:"#334155",borderRadius:"10px",height:"10px",overflow:"hidden"}}>
+            <div style={{width:`${pct}%`,height:"100%",background:"linear-gradient(90deg,#3b82f6,#a78bfa)",borderRadius:"10px",transition:"width 0.3s"}}></div>
+          </div>
+        </div>
+
+        {isAdmin && (
+          <button onClick={() => openModal("packing", { category:"Clothing", item:"" })}
+            style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>
+            + Add Packing Item
+          </button>
+        )}
+
+        {allCategories.map(cat => {
+          const items = (tripData.packingList || []).filter(i => i.category === cat);
+          if (items.length === 0) return null;
+          return (
+            <div key={cat} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+              <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>{cat} <span style={{fontSize:"12px",color:"#64748b",fontWeight:"normal"}}>({items.filter(i=>i.checked).length}/{items.length})</span></h3>
+              <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+                {items.map(item => (
+                  <div key={item.id} style={{display:"flex",alignItems:"center",gap:"12px"}}>
+                    <input type="checkbox" checked={item.checked} onChange={() => togglePackingItem(item.id)}
+                      style={{width:"18px",height:"18px",cursor:"pointer"}} />
+                    <span style={{flex:1, textDecoration:item.checked?"line-through":"none", color:item.checked?"#64748b":"white"}}>
+                      {item.item}
+                    </span>
+                    {isAdmin && (
+                      <div style={{display:"flex",gap:"4px"}}>
+                        <button onClick={() => openModal("packing", { _editId:item.id, category:item.category, item:item.item })}
+                          style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 7px",fontSize:"12px"}}>✏️</button>
+                        <button onClick={() => deletePackingItem(item.id)}
+                          style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:"15px"}}>🗑️</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ---- EXPENSES ----
   const renderExpenses = () => (
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"12px"}}>
-        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"bold",color:"#10b981"}}>₹{expenseSummary.totalSpent.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Total</div></div>
-        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center"}}><div style={{fontSize:"24px",fontWeight:"bold",color:"#3b82f6"}}>₹{expenseSummary.avgPerPerson.toLocaleString()}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Avg/Person</div></div>
+      <SyncBanner />
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}>
+          <div style={{fontSize:"22px",fontWeight:"bold",color:"#10b981"}}>₹{fmt(expenseSummary.totalSpent)}</div>
+          <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Total Spent</div>
+        </div>
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",textAlign:"center",border:"1px solid #334155"}}>
+          <div style={{fontSize:"22px",fontWeight:"bold",color:"#3b82f6"}}>₹{fmt(expenseSummary.avgPerPerson)}</div>
+          <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Avg/Person</div>
+        </div>
       </div>
-      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Who Paid</h3>{tripData.members?.map(m => (<div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span>₹{expenseSummary.paidByUser[m.name]?.toLocaleString() || 0}</span></div>))}</div>
-      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Balances (who owes whom)</h3>{tripData.members?.map(m => { const bal = expenseSummary.balance[m.name]; return (<div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span style={{color: bal > 0 ? "#10b981" : bal < 0 ? "#ef4444" : "#94a3b8"}}>{bal > 0 ? `gets ₹${bal.toFixed(0)}` : bal < 0 ? `owes ₹${Math.abs(bal).toFixed(0)}` : 'settled'}</span></div>);})}</div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h3 style={{fontWeight:"600"}}>Expense History</h3><button onClick={() => setShowExpenseModal(true)} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white"}}>+ Add Expense</button></div>
-      {tripData.expenses?.map(exp => (<div key={exp.id} style={{background:"#0f172a",borderRadius:"8px",padding:"12px",border:"1px solid #334155"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:"500"}}>{exp.description}</span><span style={{color:"#10b981"}}>₹{exp.amount.toLocaleString()}</span></div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Paid by {exp.paidBy} • Split among {exp.splitAmong.join(", ")}</div>{isAdmin && <button onClick={() => deleteExpense(exp.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>Delete</button>}</div>))}
+
+      {/* Who paid */}
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💳 Who Paid</h3>
+        {(tripData.members || []).map(m => (
+          <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}>
+            <span>{m.name}</span>
+            <span style={{fontWeight:"600"}}>₹{fmt(expenseSummary.paidByUser[m.name] || 0)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Balances */}
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>⚖️ Balances</h3>
+        {(tripData.members || []).map(m => {
+          const bal = expenseSummary.balance[m.name] || 0;
+          return (
+            <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}>
+              <span>{m.name}</span>
+              <span style={{color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8", fontWeight:"600"}}>
+                {bal > 0.01 ? `gets ₹${fmt(bal)}` : bal < -0.01 ? `owes ₹${fmt(Math.abs(bal))}` : "settled"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Settlement suggestions */}
+      {expenseSummary.settlements.length > 0 && (
+        <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #10b981"}}>
+          <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Plan</h3>
+          {expenseSummary.settlements.map((s, i) => (
+            <div key={i} style={{padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px"}}>
+              <span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span>
+              <span style={{color:"#64748b"}}> should pay </span>
+              <span style={{color:"#10b981",fontWeight:"700"}}>₹{fmt(s.amount)}</span>
+              <span style={{color:"#64748b"}}> to </span>
+              <span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add button + list */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <h3 style={{fontWeight:"600"}}>📋 Expense History</h3>
+        <button onClick={() => openModal("expense", { date:DAYS[0].date, description:"", amount:"", paidBy: memberNames[0] || "", splitAmong:[...memberNames] })}
+          style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontWeight:"500"}}>
+          + Add Expense
+        </button>
+      </div>
+
+      {(tripData.expenses || []).length === 0 && (
+        <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No expenses recorded yet</div>
+      )}
+
+      {(tripData.expenses || []).map(exp => (
+        <div key={exp.id} style={{background:"#0f172a",borderRadius:"8px",padding:"14px",border:"1px solid #334155"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div style={{flex:1}}>
+              <span style={{fontWeight:"500"}}>{exp.description}</span>
+              <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>
+                📅 {exp.date} &nbsp;|&nbsp; Paid by <strong>{exp.paidBy}</strong>
+              </div>
+              <div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>
+                Split: {(exp.splitAmong || []).join(", ")}
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"12px"}}>
+              <span style={{color:"#10b981",fontWeight:"700",fontSize:"16px"}}>₹{fmt(exp.amount)}</span>
+              <div style={{display:"flex",gap:"6px"}}>
+                <button onClick={() => openModal("expense", { _editId:exp.id, date:exp.date, description:exp.description, amount:String(exp.amount), paidBy:exp.paidBy, splitAmong:[...(exp.splitAmong||[])] })}
+                  style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
+                {isAdmin && <button onClick={() => deleteExpense(exp.id)}
+                  style={{background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer",padding:"3px 6px"}}>🗑️</button>}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
-  
+
+  // ---- POLLS ----
   const renderPolls = () => (
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-      {isAdmin && <button onClick={() => setShowPollModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Create Poll</button>}
-      {tripData.polls?.map(poll => {
-        const total = Object.values(poll.votes).reduce((a,b) => a+b, 0);
-        return (<div key={poll.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>{poll.question}</h3>{poll.options.map(opt => { const votes = poll.votes[opt] || 0; const percent = total ? (votes/total)*100 : 0; return (<div key={opt} style={{marginBottom:"12px"}}><div style={{display:"flex",justifyContent:"space-between",fontSize:"14px",marginBottom:"4px"}}><span>{opt}</span><span>{votes} vote{votes !== 1 ? 's' : ''}</span></div><div style={{background:"#334155",borderRadius:"10px",height:"8px",overflow:"hidden"}}><div style={{width:`${percent}%`,height:"100%",background:"#3b82f6",borderRadius:"10px"}}></div></div><button onClick={() => votePoll(poll.id, opt)} style={{marginTop:"6px",padding:"4px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>Vote</button></div>);})}<div style={{fontSize:"11px",color:"#64748b",marginTop:"8px"}}>Created by {poll.createdBy}</div>{isAdmin && <button onClick={() => deletePoll(poll.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>Delete Poll</button>}</div>);
-      })}
-      {(!tripData.polls || tripData.polls.length === 0) && <div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No polls yet</div>}
+      <SyncBanner />
+      {isAdmin && (
+        <button onClick={() => openModal("poll", { question:"", options:["",""] })}
+          style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>
+          + Create Poll
+        </button>
+      )}
+      {(!tripData.polls || tripData.polls.length === 0)
+        ? <div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No polls yet</div>
+        : (tripData.polls || []).map(poll => {
+          const total = Object.values(poll.votes || {}).reduce((a,b) => a+b, 0);
+          const winner = (poll.options || []).reduce((best, opt) =>
+            (poll.votes?.[opt] || 0) > (poll.votes?.[best] || 0) ? opt : best
+          , poll.options?.[0] || "");
+          return (
+            <div key={poll.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+              <h3 style={{fontWeight:"600",marginBottom:"12px"}}>{poll.question}</h3>
+              {(poll.options || []).map(opt => {
+                const votes = poll.votes?.[opt] || 0;
+                const pct = total > 0 ? (votes / total) * 100 : 0;
+                const isWinning = opt === winner && total > 0;
+                return (
+                  <div key={opt} style={{marginBottom:"12px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px",marginBottom:"4px"}}>
+                      <span style={{color: isWinning ? "#10b981" : "inherit", fontWeight: isWinning ? "600" : "normal"}}>
+                        {isWinning && "🏆 "}{opt}
+                      </span>
+                      <span style={{color:"#94a3b8"}}>{votes} vote{votes !== 1 ? "s" : ""} ({Math.round(pct)}%)</span>
+                    </div>
+                    <div style={{background:"#334155",borderRadius:"10px",height:"8px",overflow:"hidden",marginBottom:"6px"}}>
+                      <div style={{width:`${pct}%`,height:"100%",background: isWinning ? "#10b981" : "#3b82f6",borderRadius:"10px",transition:"width 0.3s"}}></div>
+                    </div>
+                    <button onClick={() => votePoll(poll.id, opt)}
+                      style={{padding:"4px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>
+                      Vote
+                    </button>
+                  </div>
+                );
+              })}
+              <div style={{fontSize:"11px",color:"#64748b",marginTop:"8px"}}>Created by {poll.createdBy} • {total} total vote{total !== 1 ? "s" : ""}</div>
+              {isAdmin && (
+                <button onClick={() => deletePoll(poll.id)}
+                  style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>
+                  🗑️ Delete Poll
+                </button>
+              )}
+            </div>
+          );
+        })
+      }
     </div>
   );
-  
+
+  // ---- MEMBERS ----
   const renderMembers = () => (
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-      {isAdmin && <button onClick={() => setShowMemberModal(true)} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Member</button>}
-      {tripData.members?.map(m => (<div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><div><span style={{fontWeight:"500"}}>{m.name}</span>{m.isAdmin && <span style={{marginLeft:"8px",fontSize:"11px",color:"#f59e0b"}}>Admin</span>}</div>{isAdmin && !m.isAdmin && <button onClick={() => deleteMember(m.id)} style={{padding:"6px 12px",background:"#ef4444",border:"none",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>Remove</button>}</div>))}
+      <SyncBanner />
+      {isAdmin && (
+        <button onClick={() => openModal("member", { name:"" })}
+          style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>
+          + Add Member
+        </button>
+      )}
+      {(tripData.members || []).map(m => (
+        <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+          <div>
+            <span style={{fontWeight:"500"}}>{m.name}</span>
+            {m.isAdmin && <span style={{marginLeft:"8px",fontSize:"11px",color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"2px 6px",borderRadius:"4px"}}>Admin</span>}
+          </div>
+          <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+            <span style={{fontSize:"12px",color: expenseSummary.balance[m.name] > 0.01 ? "#10b981" : expenseSummary.balance[m.name] < -0.01 ? "#ef4444" : "#64748b"}}>
+              {expenseSummary.balance[m.name] > 0.01 ? `+₹${fmt(expenseSummary.balance[m.name])}` :
+               expenseSummary.balance[m.name] < -0.01 ? `-₹${fmt(Math.abs(expenseSummary.balance[m.name]))}` : "Settled"}
+            </span>
+            {isAdmin && !m.isAdmin && (
+              <button onClick={() => deleteMember(m.id)}
+                style={{padding:"6px 12px",background:"#ef4444",border:"none",borderRadius:"6px",color:"white",fontSize:"12px",cursor:"pointer"}}>
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
-  
+
+  // ---- SETTINGS ----
   const renderSettings = () => (
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      {isSyncing && <div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6"}}>Syncing...</div>}
-      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}><h3 style={{fontWeight:"600",marginBottom:"12px"}}>Data Management</h3><div style={{display:"flex",flexDirection:"column",gap:"10px"}}><button onClick={resetToDefault} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white"}}>🔄 Reset to Default</button><button onClick={handleLogout} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white"}}>🚪 Sign Out</button></div></div>
-      <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"16px"}}>Trip Planner • Live sync via Firebase • Changes visible to all members</div>
+      <SyncBanner />
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"8px"}}>Logged in as</h3>
+        <p style={{color:"#94a3b8",fontSize:"14px"}}>{authUser.username} ({authUser.role})</p>
+      </div>
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>Trip Stats</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"6px",fontSize:"14px",color:"#94a3b8"}}>
+          <div>Members: <strong style={{color:"white"}}>{tripData.members?.length}</strong></div>
+          <div>Total expenses: <strong style={{color:"white"}}>{tripData.expenses?.length}</strong></div>
+          <div>Packing items: <strong style={{color:"white"}}>{tripData.packingList?.length}</strong></div>
+          <div>Polls: <strong style={{color:"white"}}>{tripData.polls?.length}</strong></div>
+        </div>
+      </div>
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>Data Management</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          {isAdmin && (
+            <button onClick={resetToDefault}
+              style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>
+              🔄 Reset to Default Data
+            </button>
+          )}
+          <button onClick={handleLogout}
+            style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>
+            🚪 Sign Out
+          </button>
+        </div>
+      </div>
+      <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"16px"}}>
+        Trip Planner • Live sync via Firebase • Changes visible to all members
+      </div>
     </div>
   );
-  
+
+  // =========================================================
+  // MODALS
+  // =========================================================
+  const renderModal = () => {
+    if (!modal) return null;
+
+    if (modal.type === "expense") {
+      return (
+        <EditModal
+          title={editForm._editId ? "Edit Expense" : "Add Expense"}
+          onClose={closeModal}
+          onSave={saveExpense}
+          values={editForm}
+          onChange={setField}
+          fields={[
+            { key:"date",        label:"Day", type:"select", options: DAYS.map(d => ({ value:d.date, label:`${d.label} (${d.date})` })) },
+            { key:"description", label:"Description", placeholder:"e.g. Hotel booking" },
+            { key:"amount",      label:"Amount (₹)", inputType:"number", placeholder:"0" },
+            { key:"paidBy",      label:"Paid By", type:"select", options: memberNames.map(n => ({ value:n, label:n })) },
+            { key:"splitAmong",  label:"Split Among", type:"checkboxGroup", options: memberNames }
+          ]}
+        />
+      );
+    }
+
+    if (modal.type === "activity") {
+      return (
+        <EditModal
+          title={editForm._editId ? "Edit Activity" : "Add Activity"}
+          onClose={closeModal}
+          onSave={saveActivity}
+          values={editForm}
+          onChange={setField}
+          fields={[
+            { key:"time",     label:"Time (HH:MM)", placeholder:"09:00" },
+            { key:"title",    label:"Activity Title", placeholder:"e.g. Breakfast" },
+            { key:"location", label:"Location", placeholder:"e.g. Hotel" },
+            { key:"notes",    label:"Notes (optional)", placeholder:"Any details..." }
+          ]}
+        />
+      );
+    }
+
+    if (modal.type === "packing") {
+      return (
+        <EditModal
+          title={editForm._editId ? "Edit Packing Item" : "Add Packing Item"}
+          onClose={closeModal}
+          onSave={savePackingItem}
+          values={editForm}
+          onChange={setField}
+          fields={[
+            { key:"category", label:"Category", type:"select", options: PACKING_CATEGORIES },
+            { key:"item",     label:"Item Name", placeholder:"e.g. Sunscreen" }
+          ]}
+        />
+      );
+    }
+
+    if (modal.type === "poll") {
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={closeModal}>
+          <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e => e.stopPropagation()}>
+            <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <h3 style={{fontWeight:"bold"}}>Create Poll</h3>
+              <button onClick={closeModal} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
+            </div>
+            <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}>
+              <div>
+                <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Question</label>
+                <input type="text" placeholder="e.g. Where should we have dinner?" value={editForm.question||""} onChange={e => setField("question", e.target.value)} style={{width:"100%"}} />
+              </div>
+              <label style={{color:"#cbd5e1",fontSize:"13px"}}>Options</label>
+              {(editForm.options||[]).map((opt, idx) => (
+                <div key={idx} style={{display:"flex",gap:"8px"}}>
+                  <input type="text" placeholder={`Option ${idx+1}`} value={opt}
+                    onChange={e => {
+                      const opts = [...(editForm.options||[])];
+                      opts[idx] = e.target.value;
+                      setField("options", opts);
+                    }}
+                    style={{flex:1}}
+                  />
+                  {idx >= 2 && (
+                    <button onClick={() => setField("options", (editForm.options||[]).filter((_,i)=>i!==idx))}
+                      style={{background:"#ef4444",border:"none",borderRadius:"6px",color:"white",padding:"0 10px",cursor:"pointer"}}>×</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={() => setField("options", [...(editForm.options||[]), ""])}
+                style={{padding:"8px",background:"#475569",border:"none",borderRadius:"6px",color:"white",cursor:"pointer"}}>
+                + Add Option
+              </button>
+              <button onClick={savePoll}
+                style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600"}}>
+                Create Poll
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (modal.type === "member") {
+      return (
+        <EditModal
+          title="Add Member"
+          onClose={closeModal}
+          onSave={saveMember}
+          values={editForm}
+          onChange={setField}
+          fields={[{ key:"name", label:"Member Name", placeholder:"e.g. Rahul" }]}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  // =========================================================
+  // TABS + LAYOUT
+  // =========================================================
   const tabs = [
-    { id: "dashboard", label: "🏠 Dashboard", component: renderDashboard },
-    { id: "itinerary", label: "📅 Itinerary", component: renderItinerary },
-    { id: "packing", label: "🎒 Packing", component: renderPacking },
-    { id: "expenses", label: "💰 Expenses", component: renderExpenses },
-    { id: "polls", label: "📊 Polls", component: renderPolls },
-    { id: "members", label: "👥 Members", component: renderMembers },
-    { id: "settings", label: "⚙️ Settings", component: renderSettings }
+    { id:"dashboard", label:"🏠 Home",      render: renderDashboard },
+    { id:"itinerary", label:"📅 Itinerary", render: renderItinerary },
+    { id:"packing",   label:"🎒 Packing",   render: renderPacking   },
+    { id:"expenses",  label:"💰 Expenses",  render: renderExpenses  },
+    { id:"polls",     label:"📊 Polls",     render: renderPolls     },
+    { id:"members",   label:"👥 Members",   render: renderMembers   },
+    { id:"settings",  label:"⚙️ Settings",  render: renderSettings  }
   ];
-  
+
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg, #0f172a, #1e1b4b)"}}>
-      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"12px 20px",display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:"10px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:"8px"}}><div style={{fontSize:"28px"}}>✈️</div><div><h1 style={{fontWeight:"bold",fontSize:"18px",color:"white"}}>Trip Planner</h1><div style={{fontSize:"11px",color:"#94a3b8"}}>Welcome, {authUser.username} {authUser.role === "admin" && "(Admin)"} • Live Sync</div></div></div>
-        <div style={{display:"flex",gap:"4px",overflowX:"auto",paddingBottom:"4px"}}>{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{padding:"6px 14px",borderRadius:"8px",fontSize:"14px",whiteSpace:"nowrap",border:"none",background: activeTab === tab.id ? "#3b82f6" : "transparent",color: activeTab === tab.id ? "white" : "#94a3b8",cursor:"pointer"}}>{tab.label}</button>))}</div>
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}}>
+      {/* Header */}
+      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"10px 16px"}}>
+        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:"8px",maxWidth:"1200px",margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <div style={{fontSize:"26px"}}>✈️</div>
+            <div>
+              <h1 style={{fontWeight:"bold",fontSize:"17px",color:"white",lineHeight:"1.2"}}>Trip Planner</h1>
+              <div style={{fontSize:"11px",color:"#94a3b8"}}>
+                {authUser.username}{isAdmin ? " (Admin)" : ""} • Live Sync {isSyncing ? "⏳" : "✅"}
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:"4px",overflowX:"auto",paddingBottom:"2px"}}>
+            {tabs.map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                style={{padding:"6px 12px",borderRadius:"8px",fontSize:"13px",whiteSpace:"nowrap",border:"none",background: activeTab===tab.id?"#3b82f6":"transparent",color: activeTab===tab.id?"white":"#94a3b8",cursor:"pointer",fontWeight: activeTab===tab.id?"600":"normal"}}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      <div style={{padding:"20px",maxWidth:"1200px",margin:"0 auto"}}>{tabs.find(t => t.id === activeTab)?.component()}</div>
-      
-      {/* Modals - same as before but with updated handlers */}
-      {showExpenseModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowExpenseModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"85vh",overflow:"auto"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Expense</h3><button onClick={() => setShowExpenseModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><select value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option value={DAYS[0].date}>Day 1</option><option value={DAYS[1].date}>Day 2</option><option value={DAYS[2].date}>Day 3</option></select><input type="text" placeholder="Description" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="number" placeholder="Amount (₹)" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><select value={newExpense.paidBy} onChange={e => setNewExpense({...newExpense, paidBy: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option value="">Select who paid</option>{tripData.members?.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}</select><div><label>Split among:</label><div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginTop:"8px"}}>{tripData.members?.map(m => (<label key={m.id} style={{display:"flex",alignItems:"center",gap:"6px"}}><input type="checkbox" checked={newExpense.splitAmong.includes(m.name)} onChange={e => { const updated = e.target.checked ? [...newExpense.splitAmong, m.name] : newExpense.splitAmong.filter(n => n !== m.name); setNewExpense({...newExpense, splitAmong: updated}); }} /><span>{m.name}</span></label>))}</div></div><button onClick={addExpense} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Expense</button></div></div></div>)}
-      
-      {showPollModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowPollModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Create Poll</h3><button onClick={() => setShowPollModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Poll question" value={newPoll.question} onChange={e => setNewPoll({...newPoll, question: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} />{newPoll.options.map((opt, idx) => (<input key={idx} type="text" placeholder={`Option ${idx+1}`} value={opt} onChange={e => { const newOpts = [...newPoll.options]; newOpts[idx] = e.target.value; setNewPoll({...newPoll, options: newOpts}); }} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} />))}<button onClick={() => setNewPoll({...newPoll, options: [...newPoll.options, ""]})} style={{padding:"8px",background:"#475569",border:"none",borderRadius:"6px",color:"white"}}>+ Add Option</button><button onClick={addPoll} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Create Poll</button></div></div></div>)}
-      
-      {showMemberModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowMemberModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"400px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Member</h3><button onClick={() => setShowMemberModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Member name" value={newMember} onChange={e => setNewMember(e.target.value)} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addMember} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Member</button></div></div></div>)}
-      
-      {showActivityModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowActivityModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Activity</h3><button onClick={() => setShowActivityModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><input type="text" placeholder="Time (e.g., 10:00)" value={newActivity.time} onChange={e => setNewActivity({...newActivity, time: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Activity title" value={newActivity.title} onChange={e => setNewActivity({...newActivity, title: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Location" value={newActivity.location} onChange={e => setNewActivity({...newActivity, location: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><input type="text" placeholder="Notes (optional)" value={newActivity.notes} onChange={e => setNewActivity({...newActivity, notes: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addActivity} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Activity</button></div></div></div>)}
-      
-      {showPackingModal && (<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={() => setShowPackingModal(false)}><div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"400px",width:"100%"}} onClick={e => e.stopPropagation()}><div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between"}}><h3 style={{fontWeight:"bold"}}>Add Packing Item</h3><button onClick={() => setShowPackingModal(false)} style={{background:"none",border:"none",color:"white",fontSize:"24px"}}>&times;</button></div><div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}><select value={newPackingItem.category} onChange={e => setNewPackingItem({...newPackingItem, category: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}}><option>Clothing</option><option>Toiletries</option><option>Electronics</option><option>Documents</option><option>Misc</option></select><input type="text" placeholder="Item name" value={newPackingItem.item} onChange={e => setNewPackingItem({...newPackingItem, item: e.target.value})} style={{padding:"10px",borderRadius:"8px",background:"#0f172a",border:"1px solid #334155",color:"white"}} /><button onClick={addPackingItem} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Add Item</button></div></div></div>)}
+
+      {/* Content */}
+      <div style={{padding:"20px 16px",maxWidth:"1200px",margin:"0 auto"}}>
+        {tabs.find(t => t.id === activeTab)?.render()}
+      </div>
+
+      {/* Modal */}
+      {renderModal()}
     </div>
   );
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
-
 </script>
 </body>
 </html>
