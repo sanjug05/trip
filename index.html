@@ -66,11 +66,27 @@ const VALID_USERS = [
   { username:"Atikab",   password:"AIStrip@001", role:"member", email:"atikab@trip.com"  }
 ];
 
-const DAYS = Array.from({ length:10 }, (_,i) => {
-  const d = new Date("2026-05-17");
-  d.setDate(d.getDate()+i);
-  return { id:i+1, label:`Day ${i+1}`, date:d.toISOString().slice(0,10) };
-});
+// DAYS will be generated dynamically from trip dates
+let DAYS = [];
+
+const generateDaysFromDates = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const days = [];
+  let current = new Date(start);
+  let dayNum = 1;
+  while (current <= end) {
+    days.push({
+      id: dayNum,
+      label: `Day ${dayNum}`,
+      date: current.toISOString().slice(0, 10)
+    });
+    current.setDate(current.getDate() + 1);
+    dayNum++;
+  }
+  return days;
+};
 
 const TRIP_ID = "current_trip";
 const PACKING_CATEGORIES   = ["Clothing","Toiletries","Electronics","Documents","Misc"];
@@ -235,21 +251,15 @@ const App = () => {
   const [budgetDraft,setBudgetDraft]         = React.useState({});
 
   // ---- default data (with new fields) ----
-  const getDefaultTripData = () => ({
-    members:[
-      {id:"m1",name:"Sanjug",isAdmin:true},
-      {id:"m2",name:"Manishk",isAdmin:false},
-      {id:"m3",name:"Atikab",isAdmin:false}
-    ],
-    itinerary:DAYS.map(day=>({
-      dayId:day.id, date:day.date,
-      activities:sortActivities([
-        {id:generateId(),time:"09:00",title:"Breakfast",location:"Hotel",notes:""},
-        {id:generateId(),time:"11:00",title:"Visit local market",location:"City Center",notes:""},
-        {id:generateId(),time:"15:00",title:"Lunch",location:"Local Restaurant",notes:""},
-        {id:generateId(),time:"18:00",title:"Sunset point",location:"Viewpoint",notes:""}
-      ])
-    })),
+const getDefaultTripData = () => ({
+  tripStartDate: "2026-05-17",
+  tripEndDate: "2026-05-26",
+  members:[
+    {id:"m1",name:"Sanjug",isAdmin:true},
+    {id:"m2",name:"Manishk",isAdmin:false},
+    {id:"m3",name:"Atikab",isAdmin:false}
+  ],
+itinerary: [],
     packingList:[
       {id:generateId(),category:"Clothing",item:"T-shirts (3)",checked:false,assignedTo:null},
       {id:generateId(),category:"Clothing",item:"Jeans/Shorts",checked:false,assignedTo:null},
@@ -288,6 +298,30 @@ const App = () => {
     if(saved) setAuthUser(JSON.parse(saved));
     else setLoading(false);
   },[]);
+// Update DAYS when trip dates change
+React.useEffect(() => {
+  if (tripData?.tripStartDate && tripData?.tripEndDate) {
+    const newDays = generateDaysFromDates(tripData.tripStartDate, tripData.tripEndDate);
+    // Update the global DAYS array
+    DAYS.length = 0;
+    DAYS.push(...newDays);
+    
+    // Also update itinerary if dates changed and no itinerary exists
+    if (tripData.itinerary && tripData.itinerary.length === 0 && newDays.length > 0) {
+      const newItinerary = newDays.map(day => ({
+        dayId: day.id,
+        date: day.date,
+        activities: sortActivities([
+          { id: generateId(), time: "09:00", title: "Breakfast", location: "Hotel", notes: "" },
+          { id: generateId(), time: "11:00", title: "Explore", location: "City Center", notes: "" },
+          { id: generateId(), time: "15:00", title: "Lunch", location: "Local Restaurant", notes: "" },
+          { id: generateId(), time: "18:00", title: "Dinner", location: "Restaurant", notes: "" }
+        ])
+      }));
+      updateTripData({ ...tripData, itinerary: newItinerary });
+    }
+  }
+}, [tripData?.tripStartDate, tripData?.tripEndDate]);
 
   // ---- firestore listener ----
   React.useEffect(()=>{
@@ -666,22 +700,39 @@ const App = () => {
   };
 
   const CountdownWidget = ()=>{
-    const tripStart = new Date("2026-05-17"); tripStart.setHours(0,0,0,0);
-    const tripEnd   = new Date("2026-05-26"); tripEnd.setHours(23,59,59,999);
-    const now       = new Date(); now.setHours(0,0,0,0);
-    const daysToStart = Math.ceil((tripStart-now)/86400000);
-    const daysToEnd   = Math.ceil((tripEnd-now)/86400000);
-    let label,color,sub;
-    if(daysToStart>0){ label=`Trip starts in ${daysToStart} day${daysToStart!==1?"s":""}!`; color="#3b82f6"; sub="May 17 – 26, 2026"; }
-    else if(daysToEnd>=0){ const dayNum=Math.min(10,11-daysToEnd); label=`Day ${dayNum} of 10 — Trip in progress!`; color="#10b981"; sub=`${daysToEnd} day${daysToEnd!==1?"s":""} remaining`; }
-    else { label="Trip has ended"; color="#64748b"; sub="May 17 – 26, 2026"; }
-    return(
-      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px 20px",border:`1px solid ${color}44`,textAlign:"center"}}>
-        <div style={{fontSize:"22px",fontWeight:"bold",color}}>{label}</div>
-        <div style={{fontSize:"12px",color:"#64748b",marginTop:"4px"}}>{sub}</div>
-      </div>
-    );
-  };
+  const tripStart = tripData?.tripStartDate ? new Date(tripData.tripStartDate) : new Date();
+  const tripEnd = tripData?.tripEndDate ? new Date(tripData.tripEndDate) : new Date();
+  tripStart.setHours(0,0,0,0);
+  tripEnd.setHours(23,59,59,999);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const daysToStart = Math.ceil((tripStart-now)/86400000);
+  const daysToEnd = Math.ceil((tripEnd-now)/86400000);
+  const totalDays = Math.ceil((tripEnd - tripStart) / 86400000) + 1;
+  const currentDayNum = totalDays - daysToEnd;
+  
+  let label,color,sub;
+  if(daysToStart>0){ 
+    label = `Trip starts in ${daysToStart} day${daysToStart!==1?"s":""}!`; 
+    color = "#3b82f6"; 
+    sub = `${tripStart.toLocaleDateString()} – ${tripEnd.toLocaleDateString()}`; 
+  }
+  else if(daysToEnd>=0){ 
+    label = `Day ${currentDayNum} of ${totalDays} — Trip in progress!`; 
+    color = "#10b981"; 
+    sub = `${daysToEnd} day${daysToEnd!==1?"s":""} remaining`; 
+  }
+  else { 
+    label = "Trip has ended"; 
+    color = "#64748b"; 
+    sub = `${tripStart.toLocaleDateString()} – ${tripEnd.toLocaleDateString()}`; 
+  }
+  return(
+    <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px 20px",border:`1px solid ${color}44`,textAlign:"center"}}>
+      <div style={{fontSize:"22px",fontWeight:"bold",color}}>{label}</div>
+      <div style={{fontSize:"12px",color:"#64748b",marginTop:"4px"}}>{sub}</div>
+    </div>
+  );
+};
 
   const RemindersDropdown = ()=>(
     <div className="reminder-dropdown" onClick={e=>e.stopPropagation()}>
@@ -1352,6 +1403,51 @@ const App = () => {
           <h3 style={{fontWeight:"600",marginBottom:"8px"}}>👤 Account</h3>
           <p style={{color:"#94a3b8",fontSize:"14px"}}>{authUser.username} ({authUser.role})</p>
         </div>
+{/* Trip Dates */}
+<div className="section-card">
+  <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📅 Trip Dates</h3>
+  <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+    <div>
+      <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Start Date</label>
+      <input 
+        type="date" 
+        value={tripData.tripStartDate || ""} 
+        onChange={e => {
+          const newStart = e.target.value;
+          const newEnd = tripData.tripEndDate;
+          if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
+            alert("Start date cannot be after end date");
+            return;
+          }
+          updateTripData({...tripData, tripStartDate: newStart});
+        }}
+        style={{width:"100%"}}
+      />
+    </div>
+    <div>
+      <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>End Date</label>
+      <input 
+        type="date" 
+        value={tripData.tripEndDate || ""} 
+        onChange={e => {
+          const newEnd = e.target.value;
+          const newStart = tripData.tripStartDate;
+          if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
+            alert("End date cannot be before start date");
+            return;
+          }
+          updateTripData({...tripData, tripEndDate: newEnd});
+        }}
+        style={{width:"100%"}}
+      />
+    </div>
+    <div style={{fontSize:"12px",color:"#64748b",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>
+      📍 Trip duration: {tripData.tripStartDate && tripData.tripEndDate ? 
+        `${Math.ceil((new Date(tripData.tripEndDate) - new Date(tripData.tripStartDate)) / 86400000) + 1} days` : 
+        "Set dates above"}
+    </div>
+  </div>
+</div>
 
         {/* Trip Currency */}
         <div className="section-card">
