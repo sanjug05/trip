@@ -1,162 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- ========== 1. IMPORTS & CDNS ========== -->
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Trip Planner PRO — Group Travel Companion</title>
+<title>Trip Planner PRO</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0f1e;color:#eef2ff}
-:root{--primary:#3b82f6;--primary-dark:#2563eb;--success:#10b981;--danger:#ef4444;--warning:#f59e0b;--bg-card:#1e293b;--bg-surface:#0f172a;--border:#334155}
+:root{--primary:#3b82f6;--success:#10b981;--danger:#ef4444;--warning:#f59e0b;--bg-card:#1e293b;--bg-surface:#0f172a;--border:#334155}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:#0f172a}
 ::-webkit-scrollbar-thumb{background:#3b82f6;border-radius:10px}
-input,select,textarea{font-family:inherit}
-input,select,textarea{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px 12px;color:#eef2ff}
+input,select,textarea{font-family:inherit;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:8px 12px;color:#eef2ff}
 input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6}
 button{cursor:pointer}
 .loading-spinner{display:inline-block;width:20px;height:20px;border:2px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 input[type="date"]{color-scheme:dark}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:0.7;cursor:pointer}
+/* Badges & Pills */
 .reminder-badge{position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center}
 .reminder-btn-wrap{position:relative;display:inline-block}
-.reminder-dropdown{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:#1e293b;border:1px solid #334155;border-radius:12px;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
-.stat-card{background:#1e293b;border-radius:12px;padding:16px;text-align:center;border:1px solid #334155}
-.section-card{background:#1e293b;border-radius:12px;padding:16px;border:1px solid #334155}
-.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
 .pill-green{background:rgba(16,185,129,0.15);color:#10b981}
 .pill-blue{background:rgba(59,130,246,0.15);color:#3b82f6}
 .pill-yellow{background:rgba(245,158,11,0.15);color:#f59e0b}
 .pill-red{background:rgba(239,68,68,0.15);color:#ef4444}
 .pill-gray{background:rgba(100,116,139,0.15);color:#64748b}
+.pill-purple{background:rgba(167,139,250,0.15);color:#a78bfa}
+/* Cards */
+.stat-card{background:#1e293b;border-radius:12px;padding:16px;text-align:center;border:1px solid #334155}
+.section-card{background:#1e293b;border-radius:12px;padding:16px;border:1px solid #334155}
+/* Progress */
 .progress-bar-wrap{background:#334155;border-radius:10px;height:8px;overflow:hidden}
 .progress-bar-fill{height:100%;border-radius:10px;transition:width 0.3s}
+/* Misc */
 textarea{resize:vertical;min-height:80px}
+mark{background:#f59e0b33;color:#f59e0b;border-radius:2px;padding:0 2px}
+/* Dropdowns */
+.reminder-dropdown{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:#1e293b;border:1px solid #334155;border-radius:12px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+.search-wrap{position:relative}
+.search-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:280px;background:#1e293b;border:1px solid #334155;border-radius:12px;z-index:300;max-height:360px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+.search-result-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #0f172a;display:flex;align-items:center;gap:10px}
+.search-result-item:hover{background:#0f172a}
+/* Link chips */
+.link-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:11px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;cursor:pointer}
+.link-chip:hover{background:rgba(59,130,246,0.2)}
+/* FAB */
+.fab{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.fab-main{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6d28d9);border:none;color:white;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(59,130,246,0.5)}
+.fab-main:hover{transform:scale(1.06)}
+.fab-menu-item{display:flex;align-items:center;gap:8px}
+.fab-item-btn{padding:8px 14px;background:#1e293b;border:1px solid #334155;border-radius:20px;color:white;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.4);white-space:nowrap}
+.fab-item-btn:hover{background:#334155}
+/* Attention card */
+.attention-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #334155}
 @media(max-width:600px){.hide-mobile{display:none!important}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<!-- React -->
 <script src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
 <script type="text/babel" data-presets="react">
 
-// ========== FIREBASE CONFIG ==========
+// ========== 2. FIREBASE CONFIG ==========
 const firebaseConfig = {
-  apiKey: "AIzaSyDav3rI7fTr8KrXYxvnz5LB82CgjRq4v20",
-  authDomain: "ais-showroom-dashboard.firebaseapp.com",
-  projectId: "ais-showroom-dashboard",
-  storageBucket: "ais-showroom-dashboard.firebasestorage.app",
-  messagingSenderId: "175667492150",
-  appId: "1:175667492150:web:cb124eb267b4689e6a2f97"
+  apiKey:"AIzaSyDav3rI7fTr8KrXYxvnz5LB82CgjRq4v20",
+  authDomain:"ais-showroom-dashboard.firebaseapp.com",
+  projectId:"ais-showroom-dashboard",
+  storageBucket:"ais-showroom-dashboard.firebasestorage.app",
+  messagingSenderId:"175667492150",
+  appId:"1:175667492150:web:cb124eb267b4689e6a2f97"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ========== CONFIG ==========
+// ========== 3. CONSTANTS & CONFIG ==========
 const VALID_USERS = [
-  { username:"Sanjug",   password:"AIStrip@001", role:"admin",  email:"sanjug@trip.com"  },
-  { username:"Manishk",  password:"AIStrip@001", role:"member", email:"manishk@trip.com" },
-  { username:"Atikab",   password:"AIStrip@001", role:"member", email:"atikab@trip.com"  }
+  {username:"Sanjug",  password:"AIStrip@001", role:"admin"},
+  {username:"Manishk", password:"AIStrip@001", role:"member"},
+  {username:"Atikab",  password:"AIStrip@001", role:"member"}
 ];
-
-// DAYS will be generated dynamically from trip dates
-let DAYS = [];
-
-const generateDaysFromDates = (startDate, endDate) => {
-  if (!startDate || !endDate) return [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+const DEFAULT_START = "2026-05-17";
+const DEFAULT_END = "2026-05-26";
+const DAYS = (() => {
   const days = [];
+  const start = new Date(DEFAULT_START);
+  const end = new Date(DEFAULT_END);
   let current = new Date(start);
   let dayNum = 1;
   while (current <= end) {
-    days.push({
-      id: dayNum,
-      label: `Day ${dayNum}`,
-      date: current.toISOString().slice(0, 10)
-    });
+    days.push({ id: dayNum, label: `Day ${dayNum}`, date: current.toISOString().slice(0, 10) });
     current.setDate(current.getDate() + 1);
     dayNum++;
   }
   return days;
+})();
+const TRIP_ID            = "current_trip";
+const PACKING_CATEGORIES = ["Clothing","Toiletries","Electronics","Documents","Misc"];
+const EXPENSE_CATEGORIES = ["Food","Transport","Stay","Activities","Shopping","Misc"];
+const BOOKING_TYPES      = ["Flight","Hotel","Train","Cab","Activity","Other"];
+const BOOKING_STATUSES   = ["confirmed","pending","cancelled"];
+const TASK_STATUSES      = ["pending","in-progress","done"];
+const NOTE_CATEGORIES    = ["General","Idea","Reminder","Important","Meeting"];
+const CURRENCIES         = ["INR","USD","EUR","GBP","JPY","AED","SGD","THB","MYR","AUD","CAD","VND"];
+const CURRENCY_SYMBOLS   = {INR:"₹",USD:"$",EUR:"€",GBP:"£",JPY:"¥",AED:"د.إ",SGD:"S$",THB:"฿",MYR:"RM",AUD:"A$",CAD:"C$",VND:"₫"};
+const CAT_PILL   = {Food:"pill-yellow",Transport:"pill-blue",Stay:"pill-purple",Activities:"pill-green",Shopping:"pill-red",Misc:"pill-gray"};
+const NOTE_PILL  = {General:"pill-gray",Idea:"pill-blue",Reminder:"pill-yellow",Important:"pill-red",Meeting:"pill-purple"};
+const WMO_ICONS  = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌧️",61:"🌦️",63:"🌧️",65:"⛈️",71:"🌨️",73:"❄️",80:"🌦️",81:"⛈️",95:"⛈️"};
+const TYPE_ICON  = {Flight:"✈️",Hotel:"🏨",Train:"🚂",Cab:"🚕",Activity:"🎯",Other:"📌"};
+
+// ========== 4. HELPER FUNCTIONS ==========
+const generateId     = ()=>`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+const fmt            = n=>isNaN(n)?"0":Math.round(n).toLocaleString("en-IN");
+const fmtD           = n=>isNaN(n)?"0.00":Number(n).toFixed(2);
+const today          = ()=>new Date().toISOString().slice(0,10);
+const sortActivities = acts=>[...acts].sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+
+const Highlight = ({text,query}) => {
+  if(!query||!text) return <span>{text}</span>;
+  const s=String(text), ql=query.toLowerCase();
+  const idx=s.toLowerCase().indexOf(ql);
+  if(idx===-1) return <span>{s}</span>;
+  return <span>{s.slice(0,idx)}<mark>{s.slice(idx,idx+query.length)}</mark>{s.slice(idx+query.length)}</span>;
 };
 
-const TRIP_ID = "current_trip";
-const PACKING_CATEGORIES   = ["Clothing","Toiletries","Electronics","Documents","Misc"];
-const EXPENSE_CATEGORIES   = ["Food","Transport","Stay","Activities","Shopping","Misc"];
-const BOOKING_TYPES        = ["Flight","Hotel","Train","Cab","Activity","Other"];
-const BOOKING_STATUSES     = ["confirmed","pending","cancelled"];
-const CURRENCIES           = ["INR","USD","EUR","GBP","JPY","AED","SGD","THB","MYR","AUD","CAD"];
-const CURRENCY_SYMBOLS     = {INR:"₹",USD:"$",EUR:"€",GBP:"£",JPY:"¥",AED:"د.إ",SGD:"S$",THB:"฿",MYR:"RM",AUD:"A$",CAD:"C$"};
-const TASK_STATUSES        = ["pending","in-progress","done"];
-const STATUS_PILL_CLASS    = {confirmed:"pill-green",pending:"pill-yellow",cancelled:"pill-red","in-progress":"pill-blue",done:"pill-green"};
-const WMO_CODES = {0:"Clear",1:"Mainly Clear",2:"Partly Cloudy",3:"Overcast",45:"Foggy",48:"Freezing Fog",51:"Light Drizzle",53:"Drizzle",55:"Heavy Drizzle",61:"Light Rain",63:"Rain",65:"Heavy Rain",71:"Light Snow",73:"Snow",75:"Heavy Snow",80:"Rain Showers",81:"Heavy Showers",95:"Thunderstorm"};
-
-// ========== HELPERS ==========
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-const fmt  = n => isNaN(n) ? "0" : Math.round(n).toLocaleString("en-IN");
-const fmtD = n => isNaN(n) ? "0.00" : Number(n).toFixed(2);
-
-const sortActivities = acts => [...acts].sort((a,b)=>(a.time||"").localeCompare(b.time||""));
-
-const calculateExpenseSummary = (expenses, members) => {
-  const memberNames = members.map(m=>m.name);
+const calcExpenseSummary = (expenses,members) => {
+  const names=members.map(m=>m.name);
   let totalSpent=0;
-  const paidByUser={}, sharePerUser={};
-  memberNames.forEach(n=>{ paidByUser[n]=0; sharePerUser[n]=0; });
-  const byCategory={};
-  EXPENSE_CATEGORIES.forEach(c=>{ byCategory[c]=0; });
-
-  (expenses||[]).forEach(exp=>{
-    const amount = parseFloat(exp.amount)||0;
-    totalSpent += amount;
-    paidByUser[exp.paidBy] = (paidByUser[exp.paidBy]||0)+amount;
-    const among = exp.splitAmong?.length>0 ? exp.splitAmong : memberNames;
-    const share = amount/among.length;
-    among.forEach(p=>{ sharePerUser[p]=(sharePerUser[p]||0)+share; });
-    const cat = exp.category||"Misc";
-    byCategory[cat]=(byCategory[cat]||0)+amount;
+  const paidBy={},share={},byCat={};
+  names.forEach(n=>{paidBy[n]=0;share[n]=0;});
+  EXPENSE_CATEGORIES.forEach(c=>{byCat[c]=0;});
+  (expenses||[]).forEach(e=>{
+    const amt=parseFloat(e.amount)||0; totalSpent+=amt;
+    paidBy[e.paidBy]=(paidBy[e.paidBy]||0)+amt;
+    const among=e.splitAmong?.length>0?e.splitAmong:names;
+    const s=amt/among.length;
+    among.forEach(p=>{share[p]=(share[p]||0)+s;});
+    byCat[e.category||"Misc"]=(byCat[e.category||"Misc"]||0)+amt;
   });
-
   const balance={};
-  memberNames.forEach(n=>{ balance[n]=(paidByUser[n]||0)-(sharePerUser[n]||0); });
-
+  names.forEach(n=>{balance[n]=(paidBy[n]||0)-(share[n]||0);});
   const settlements=[];
-  const debtors  = memberNames.filter(n=>balance[n]<-0.01).map(n=>({name:n,amount:-balance[n]})).sort((a,b)=>b.amount-a.amount);
-  const creditors = memberNames.filter(n=>balance[n]>0.01).map(n=>({name:n,amount:balance[n]})).sort((a,b)=>b.amount-a.amount);
+  const debtors  =names.filter(n=>balance[n]<-0.01).map(n=>({name:n,amt:-balance[n]})).sort((a,b)=>b.amt-a.amt);
+  const creditors=names.filter(n=>balance[n]>0.01) .map(n=>({name:n,amt:balance[n]})).sort((a,b)=>b.amt-a.amt);
   let di=0,ci=0;
   while(di<debtors.length&&ci<creditors.length){
-    const pay=Math.min(debtors[di].amount,creditors[ci].amount);
+    const pay=Math.min(debtors[di].amt,creditors[ci].amt);
     if(pay>0.01) settlements.push({from:debtors[di].name,to:creditors[ci].name,amount:pay});
-    debtors[di].amount-=pay; creditors[ci].amount-=pay;
-    if(debtors[di].amount<0.01) di++;
-    if(creditors[ci].amount<0.01) ci++;
+    debtors[di].amt-=pay; creditors[ci].amt-=pay;
+    if(debtors[di].amt<0.01)di++; if(creditors[ci].amt<0.01)ci++;
   }
-  return {totalSpent, avgPerPerson:memberNames.length>0?totalSpent/memberNames.length:0, paidByUser, sharePerUser, balance, settlements, byCategory};
+  return {totalSpent,avgPerPerson:names.length>0?totalSpent/names.length:0,paidBy,share,balance,settlements,byCat};
 };
 
-// ========== LOGIN PAGE ==========
+// ========== 5. LOGIN PAGE COMPONENT ==========
 const LoginPage = ({onLogin}) => {
-  const [username,setUsername] = React.useState("");
-  const [password,setPassword] = React.useState("");
-  const [error,setError]       = React.useState("");
-  const [loading,setLoading]   = React.useState(false);
-
-  const handleSubmit = e => {
+  const [u,setU]=React.useState(""), [p,setP]=React.useState(""), [err,setErr]=React.useState(""), [loading,setLoading]=React.useState(false);
+  const submit=e=>{
     e.preventDefault();
-    const user = VALID_USERS.find(u=>u.username===username&&u.password===password);
-    if(user){ setLoading(true); localStorage.setItem("trip_auth",JSON.stringify({username:user.username,role:user.role})); onLogin({username:user.username,role:user.role}); }
-    else setError("Invalid username or password");
+    const user=VALID_USERS.find(x=>x.username===u&&x.password===p);
+    if(user){setLoading(true);localStorage.setItem("trip_auth",JSON.stringify({username:user.username,role:user.role}));onLogin({username:user.username,role:user.role});}
+    else setErr("Invalid username or password");
   };
-
-  return (
+  return(
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
       <div style={{background:"rgba(30,41,59,0.9)",backdropFilter:"blur(10px)",borderRadius:"24px",padding:"32px",width:"100%",maxWidth:"400px",border:"1px solid #334155"}}>
         <div style={{textAlign:"center",marginBottom:"24px"}}>
@@ -164,62 +181,51 @@ const LoginPage = ({onLogin}) => {
           <h1 style={{fontSize:"24px",fontWeight:"bold",color:"white"}}>Trip Planner PRO</h1>
           <p style={{color:"#94a3b8",fontSize:"14px",marginTop:"4px"}}>Group travel companion · Live Sync</p>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div style={{marginBottom:"16px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Username</label><input type="text" value={username} onChange={e=>setUsername(e.target.value)} placeholder="Enter username" style={{width:"100%"}} /></div>
-          <div style={{marginBottom:"20px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" style={{width:"100%"}} /></div>
-          {error&&<div style={{marginBottom:"16px",color:"#ef4444",fontSize:"14px",textAlign:"center"}}>{error}</div>}
+        <form onSubmit={submit}>
+          <div style={{marginBottom:"16px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Username</label><input value={u} onChange={e=>setU(e.target.value)} placeholder="Enter username" style={{width:"100%"}}/></div>
+          <div style={{marginBottom:"20px"}}><label style={{display:"block",color:"#cbd5e1",fontSize:"14px",marginBottom:"6px"}}>Password</label><input type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Enter password" style={{width:"100%"}}/></div>
+          {err&&<div style={{marginBottom:"16px",color:"#ef4444",fontSize:"14px",textAlign:"center"}}>{err}</div>}
           <button type="submit" disabled={loading} style={{width:"100%",padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",fontSize:"16px",opacity:loading?0.7:1}}>{loading?"Loading...":"Sign In"}</button>
         </form>
-        <div style={{marginTop:"20px",textAlign:"center",fontSize:"11px",color:"#64748b"}}>Live sync via Firebase · Changes visible to all</div>
+        <div style={{marginTop:"20px",textAlign:"center",fontSize:"11px",color:"#64748b"}}>Live sync via Firebase · Visible to all members</div>
       </div>
     </div>
   );
 };
 
-// ========== GENERIC EDIT MODAL ==========
+// ========== 6. EDIT MODAL COMPONENT ==========
 const EditModal = ({title,fields,values,onChange,onSave,onClose}) => (
-  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={onClose}>
+  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:"16px"}} onClick={onClose}>
     <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
-      <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#1e293b",zIndex:1}}>
         <h3 style={{fontWeight:"bold"}}>{title}</h3>
         <button onClick={onClose} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
       </div>
       <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}>
         {fields.map(f=>{
+          const lbl=f.label&&<label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>;
           if(f.type==="select") return(
-            <div key={f.key}>{f.label&&<label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
+            <div key={f.key}>{lbl}
               <select value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}}>
-                {(f.options||[]).map(opt=><option key={opt.value||opt} value={opt.value||opt}>{opt.label||opt}</option>)}
+                {(f.options||[]).map(o=><option key={o.value??o} value={o.value??o}>{o.label??o}</option>)}
               </select>
             </div>
           );
           if(f.type==="checkboxGroup") return(
-            <div key={f.key}><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"6px"}}>{f.label}</label>
+            <div key={f.key}>{lbl}
               <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-                {(f.options||[]).map(opt=>(
-                  <label key={opt} style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
-                    <input type="checkbox" checked={(values[f.key]||[]).includes(opt)} onChange={e=>{const arr=values[f.key]||[];onChange(f.key,e.target.checked?[...arr,opt]:arr.filter(x=>x!==opt));}} />
-                    <span style={{fontSize:"14px"}}>{opt}</span>
+                {(f.options||[]).map(o=>(
+                  <label key={o} style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
+                    <input type="checkbox" checked={(values[f.key]||[]).includes(o)} onChange={e=>{const a=values[f.key]||[];onChange(f.key,e.target.checked?[...a,o]:a.filter(x=>x!==o));}}/>
+                    <span style={{fontSize:"14px"}}>{o}</span>
                   </label>
                 ))}
               </div>
             </div>
           );
-          if(f.type==="date") return(
-            <div key={f.key}>{f.label&&<label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
-              <input type="date" value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}} />
-            </div>
-          );
-          if(f.type==="textarea") return(
-            <div key={f.key}>{f.label&&<label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
-              <textarea placeholder={f.placeholder||f.label||""} value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}} />
-            </div>
-          );
-          return(
-            <div key={f.key}>{f.label&&<label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>{f.label}</label>}
-              <input type={f.inputType||"text"} placeholder={f.placeholder||f.label||""} value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}} />
-            </div>
-          );
+          if(f.type==="date") return <div key={f.key}>{lbl}<input type="date" value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}}/></div>;
+          if(f.type==="textarea") return <div key={f.key}>{lbl}<textarea placeholder={f.placeholder||""} value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}}/></div>;
+          return <div key={f.key}>{lbl}<input type={f.inputType||"text"} placeholder={f.placeholder||f.label||""} value={values[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} style={{width:"100%"}}/></div>;
         })}
         <button onClick={onSave} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",marginTop:"4px"}}>Save</button>
       </div>
@@ -227,9 +233,11 @@ const EditModal = ({title,fields,values,onChange,onSave,onClose}) => (
   </div>
 );
 
-// ========== MAIN APP ==========
+// ========== 7. MAIN APP COMPONENT ==========
 const App = () => {
-  // ---- existing state ----
+
+// ========== 7a. STATE DECLARATIONS ==========
+  // — Core —
   const [authUser,setAuthUser]   = React.useState(null);
   const [tripData,setTripData]   = React.useState(null);
   const [loading,setLoading]     = React.useState(true);
@@ -238,507 +246,436 @@ const App = () => {
   const [modal,setModal]         = React.useState(null);
   const [editForm,setEditForm]   = React.useState({});
   const [isSyncing,setIsSyncing] = React.useState(false);
+  // — Feature state —
+  const [exchangeRate,setExchangeRate]         = React.useState(1);
+  const [weather,setWeather]                   = React.useState(null);
+  const [weatherLoading,setWeatherLoading]     = React.useState(false);
+  const [showReminders,setShowReminders]       = React.useState(false);
+  const [docSection,setDocSection]             = React.useState("passports");
+  const [taskFilter,setTaskFilter]             = React.useState("all");
+  const [bookingFilter,setBookingFilter]       = React.useState("all");
+  const [budgetEditMode,setBudgetEditMode]     = React.useState(false);
+  const [budgetDraft,setBudgetDraft]           = React.useState({});
+  const [destCityDraft,setDestCityDraft]       = React.useState("");
+  // — New in this version —
+  const [searchQuery,setSearchQuery]           = React.useState("");
+  const [showSearch,setShowSearch]             = React.useState(false);
+  const [showFAB,setShowFAB]                   = React.useState(false);
+  const [noteFilter,setNoteFilter]             = React.useState("all");
+  const [checkinFilter,setCheckinFilter]       = React.useState("all");
 
-  // ---- new state ----
-  const [exchangeRate,setExchangeRate]       = React.useState(1);
-  const [weather,setWeather]                 = React.useState(null);
-  const [weatherLoading,setWeatherLoading]   = React.useState(false);
-  const [showReminders,setShowReminders]     = React.useState(false);
-  const [docSection,setDocSection]           = React.useState("passports");
-  const [taskFilter,setTaskFilter]           = React.useState("all");
-  const [bookingFilter,setBookingFilter]     = React.useState("all");
-  const [budgetEditMode,setBudgetEditMode]   = React.useState(false);
-  const [budgetDraft,setBudgetDraft]         = React.useState({});
-
-  // ---- default data (with new fields) ----
-const getDefaultTripData = () => ({
-  tripStartDate: "2026-05-17",
-  tripEndDate: "2026-05-26",
-  members:[
-    {id:"m1",name:"Sanjug",isAdmin:true},
-    {id:"m2",name:"Manishk",isAdmin:false},
-    {id:"m3",name:"Atikab",isAdmin:false}
-  ],
-itinerary: [],
+// ========== 7b. DEFAULT DATA ==========
+  const getDefaultTripData = () => ({
+    members:[
+      {id:"m1",name:"Sanjug",isAdmin:true},
+      {id:"m2",name:"Manishk",isAdmin:false},
+      {id:"m3",name:"Atikab",isAdmin:false}
+    ],
+    itinerary: DAYS.map(day => ({
+  dayId: day.id,
+  date: day.date,
+  activities: []
+})),
     packingList:[
-      {id:generateId(),category:"Clothing",item:"T-shirts (3)",checked:false,assignedTo:null},
-      {id:generateId(),category:"Clothing",item:"Jeans/Shorts",checked:false,assignedTo:null},
-      {id:generateId(),category:"Clothing",item:"Jacket/Sweater",checked:false,assignedTo:null},
-      {id:generateId(),category:"Clothing",item:"Underwear & Socks",checked:false,assignedTo:null},
-      {id:generateId(),category:"Toiletries",item:"Toothbrush & Paste",checked:false,assignedTo:null},
-      {id:generateId(),category:"Toiletries",item:"Shampoo & Soap",checked:false,assignedTo:null},
-      {id:generateId(),category:"Toiletries",item:"Sunscreen",checked:false,assignedTo:null},
-      {id:generateId(),category:"Electronics",item:"Phone charger",checked:false,assignedTo:null},
-      {id:generateId(),category:"Electronics",item:"Power bank",checked:false,assignedTo:null},
-      {id:generateId(),category:"Documents",item:"ID proof",checked:false,assignedTo:null},
-      {id:generateId(),category:"Misc",item:"First aid kit",checked:false,assignedTo:null},
-      {id:generateId(),category:"Misc",item:"Snacks",checked:false,assignedTo:null}
+      {id:generateId(),category:"Clothing",item:"T-shirts (3)",checked:false},
+      {id:generateId(),category:"Clothing",item:"Jeans/Shorts",checked:false},
+      {id:generateId(),category:"Clothing",item:"Jacket/Sweater",checked:false},
+      {id:generateId(),category:"Toiletries",item:"Toothbrush & Paste",checked:false},
+      {id:generateId(),category:"Toiletries",item:"Sunscreen",checked:false},
+      {id:generateId(),category:"Electronics",item:"Phone charger",checked:false},
+      {id:generateId(),category:"Electronics",item:"Power bank",checked:false},
+      {id:generateId(),category:"Documents",item:"ID proof",checked:false},
+      {id:generateId(),category:"Misc",item:"First aid kit",checked:false}
     ],
-    expenses:[
-      {id:generateId(),date:DAYS[0].date,description:"Hotel booking",amount:15000,paidBy:"Sanjug",splitAmong:["Sanjug","Manishk","Atikab"],category:"Stay"},
-      {id:generateId(),date:DAYS[0].date,description:"Dinner",amount:2400,paidBy:"Manishk",splitAmong:["Sanjug","Manishk","Atikab"],category:"Food"},
-      {id:generateId(),date:DAYS[1].date,description:"Taxi fare",amount:1200,paidBy:"Atikab",splitAmong:["Sanjug","Manishk","Atikab"],category:"Transport"}
-    ],
-    polls:[
-      {id:generateId(),question:"Where should we have dinner on Day 2?",options:["Indian restaurant","Italian place","Street food"],votes:{"Indian restaurant":2,"Italian place":1,"Street food":0},createdBy:"Sanjug"}
-    ],
-    // ---- NEW FIELDS ----
+expenses:[],
+    polls:[{id:generateId(),question:"Where should we have dinner on Day 2?",options:["Indian restaurant","Italian place","Street food"],votes:{"Indian restaurant":2,"Italian place":1,"Street food":0},createdBy:"Sanjug"}],
     bookings:[],
     documents:{passports:[],insurance:{},emergencyContacts:[],medicalNotes:""},
     tasks:[],
     budgetTargets:{Food:5000,Transport:3000,Stay:20000,Activities:4000,Shopping:3000,Misc:2000},
     tripCurrency:"INR",
     destinationCity:"Mumbai",
-    savedTemplates:[]
+    savedTemplates:[],
+    tripNotes:[],
+    quickLinks:[],
+    checkins:[]
   });
 
-  // ---- auth init ----
+// ========== 7c. USE EFFECTS ==========
+  // Auth restore
   React.useEffect(()=>{
-    const saved = localStorage.getItem("trip_auth");
-    if(saved) setAuthUser(JSON.parse(saved));
-    else setLoading(false);
+    const s=localStorage.getItem("trip_auth");
+    if(s) setAuthUser(JSON.parse(s)); else setLoading(false);
   },[]);
-// Update DAYS when trip dates change
-React.useEffect(() => {
-  if (tripData?.tripStartDate && tripData?.tripEndDate) {
-    const newDays = generateDaysFromDates(tripData.tripStartDate, tripData.tripEndDate);
-    // Update the global DAYS array
-    DAYS.length = 0;
-    DAYS.push(...newDays);
-    
-    // Also update itinerary if dates changed and no itinerary exists
-    if (tripData.itinerary && tripData.itinerary.length === 0 && newDays.length > 0) {
-      const newItinerary = newDays.map(day => ({
-        dayId: day.id,
-        date: day.date,
-        activities: sortActivities([
-          { id: generateId(), time: "09:00", title: "Breakfast", location: "Hotel", notes: "" },
-          { id: generateId(), time: "11:00", title: "Explore", location: "City Center", notes: "" },
-          { id: generateId(), time: "15:00", title: "Lunch", location: "Local Restaurant", notes: "" },
-          { id: generateId(), time: "18:00", title: "Dinner", location: "Restaurant", notes: "" }
-        ])
-      }));
-      updateTripData({ ...tripData, itinerary: newItinerary });
-    }
-  }
-}, [tripData?.tripStartDate, tripData?.tripEndDate]);
 
-  // ---- firestore listener ----
+  // Firestore listener
   React.useEffect(()=>{
     if(!authUser) return;
-    const docRef = db.collection("trips").doc(TRIP_ID);
-    let unsub = null;
-    const init = async()=>{
-      try{
-        const doc = await docRef.get();
-        if(!doc.exists) await docRef.set(getDefaultTripData());
-      }catch(err){ console.error(err); }
-      finally{
-        unsub = docRef.onSnapshot(snap=>{
-          if(snap.exists) setTripData(snap.data());
-          setLoading(false);
-        }, err=>{ console.error(err); setLoading(false); });
-      }
+    const ref=db.collection("trips").doc(TRIP_ID);
+    let unsub=null;
+    const init=async()=>{
+      try{const d=await ref.get();if(!d.exists)await ref.set(getDefaultTripData());}catch(e){console.error(e);}
+      finally{unsub=ref.onSnapshot(snap=>{if(snap.exists)setTripData(snap.data());setLoading(false);},e=>{console.error(e);setLoading(false);});}
     };
     init();
-    return ()=> unsub&&unsub();
+    return()=>unsub&&unsub();
   },[authUser]);
 
-  // ---- currency fetch ----
+  // Currency rate
   React.useEffect(()=>{
     if(!tripData) return;
-    const cur = tripData.tripCurrency||"INR";
-    if(cur==="INR"){ setExchangeRate(1); return; }
+    const cur=tripData.tripCurrency||"INR";
+    if(cur==="INR"){setExchangeRate(1);return;}
     fetch(`https://api.frankfurter.app/latest?from=INR&to=${cur}`)
-      .then(r=>r.json())
-      .then(data=>{ if(data.rates?.[cur]) setExchangeRate(data.rates[cur]); })
-      .catch(()=>{});
+      .then(r=>r.json()).then(d=>{if(d.rates?.[cur])setExchangeRate(d.rates[cur]);}).catch(()=>{});
   },[tripData?.tripCurrency]);
 
-  // ---- weather fetch ----
+  // Weather
   React.useEffect(()=>{
     if(!tripData) return;
-    const city = tripData.destinationCity||"Mumbai";
-    setWeatherLoading(true);
-    setWeather(null);
+    const city=tripData.destinationCity||"Mumbai";
+    setDestCityDraft(city); setWeatherLoading(true); setWeather(null);
     fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`)
-      .then(r=>r.json())
-      .then(data=>setWeather(data))
-      .catch(()=>{})
-      .finally(()=>setWeatherLoading(false));
+      .then(r=>r.json()).then(d=>setWeather(d)).catch(()=>{}).finally(()=>setWeatherLoading(false));
   },[tripData?.destinationCity]);
 
-  const updateTripData = async newData=>{
-    setIsSyncing(true);
-    try{ await db.collection("trips").doc(TRIP_ID).set(newData); }
-    catch(err){ console.error(err); alert("Save failed. Check connection."); }
-    finally{ setIsSyncing(false); }
-  };
+  // Global click — close overlays
+  React.useEffect(()=>{
+    const h=()=>{setShowReminders(false);setShowSearch(false);setShowFAB(false);};
+    document.addEventListener("click",h);
+    return()=>document.removeEventListener("click",h);
+  },[]);
 
-  const handleLogout = ()=>{ localStorage.removeItem("trip_auth"); setAuthUser(null); setTripData(null); setLoading(false); };
-
-  // ---- loading screens ----
-  if(loading) return(
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div className="loading-spinner" style={{width:"40px",height:"40px"}}></div>
-    </div>
-  );
-  if(!authUser) return <LoginPage onLogin={u=>{ setAuthUser(u); setLoading(true); }} />;
-  if(!tripData) return(
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}>
-      <div className="loading-spinner" style={{width:"40px",height:"40px"}}></div>
-      <div style={{color:"#94a3b8",fontSize:"14px"}}>Loading trip data…</div>
-    </div>
-  );
-
-  // ========== COMPUTED ==========
-  const isAdmin      = authUser.role==="admin";
-  const memberNames  = (tripData.members||[]).map(m=>m.name);
-  const expenseSummary = calculateExpenseSummary(tripData.expenses||[], tripData.members||[]);
+// ========== COMPUTED ==========
+  const isAdmin      = authUser?.role==="admin";
+  const memberNames  = (tripData?.members||[]).map(m=>m.name);
+  const expSummary   = tripData ? calcExpenseSummary(tripData.expenses||[],tripData.members||[]) : {totalSpent:0,avgPerPerson:0,paidBy:{},balance:{},settlements:[],byCat:{}};
   const currentDay   = DAYS.find(d=>d.id===activeDay);
-  const tripCurrency = tripData.tripCurrency||"INR";
+  const tripCurrency = tripData?.tripCurrency||"INR";
   const curSym       = CURRENCY_SYMBOLS[tripCurrency]||tripCurrency;
 
-  // ---- currency formatter ----
-  const formatAmt = amtINR => {
-    if(!amtINR && amtINR!==0) return "—";
-    if(tripCurrency==="INR") return `₹${fmt(amtINR)}`;
-    const conv = amtINR * (exchangeRate||1);
-    return `${curSym}${fmtD(conv)} (₹${fmt(amtINR)})`;
+  const fmtAmt = n => {
+    if(!n&&n!==0) return "—";
+    if(tripCurrency==="INR") return `₹${fmt(n)}`;
+    return `${curSym}${fmtD(n*(exchangeRate||1))} (₹${fmt(n)})`;
   };
 
-  // ---- reminders ----
+  const updateTripData = async nd=>{
+    setIsSyncing(true);
+    try{await db.collection("trips").doc(TRIP_ID).set(nd);}
+    catch(e){console.error(e);alert("Save failed. Check connection.");}
+    finally{setIsSyncing(false);}
+  };
+  const handleLogout = ()=>{localStorage.removeItem("trip_auth");setAuthUser(null);setTripData(null);setLoading(false);};
+  const SyncBanner = ()=>isSyncing?<div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6",padding:"4px",background:"rgba(59,130,246,0.1)",borderRadius:"6px",marginBottom:"8px"}}>⏳ Syncing…</div>:null;
+
+  // ========== MOVED: All hooks and helpers BEFORE conditional returns ==========
+  const openModal = (type,init={})=>{setEditForm(init);setModal({type});};
+  const closeModal = ()=>{setModal(null);setEditForm({});};
+  const setField = (k,v)=>setEditForm(p=>({...p,[k]:v}));
+
+  // Search results useMemo
+  const searchResults = React.useMemo(()=>{
+    const q=(searchQuery||"").trim();
+    if(q.length<2) return [];
+    const ql=q.toLowerCase();
+    const match=t=>String(t||"").toLowerCase().includes(ql);
+    const res=[];
+    (tripData?.bookings||[]).forEach(b=>{if(match(b.title))res.push({type:"Booking",icon:"📋",label:b.title,sub:b.date,tab:"bookings",dayId:null});});
+    (tripData?.tasks||[]).forEach(t=>{if(match(t.title)||match(t.description))res.push({type:"Task",icon:"✅",label:t.title,sub:t.assignedTo,tab:"tasks",dayId:null});});
+    (tripData?.expenses||[]).forEach(e=>{if(match(e.description))res.push({type:"Expense",icon:"💰",label:e.description,sub:`₹${fmt(e.amount)}`,tab:"expenses",dayId:null});});
+    (tripData?.members||[]).forEach(m=>{if(match(m.name))res.push({type:"Member",icon:"👤",label:m.name,sub:m.isAdmin?"Admin":"Member",tab:"members",dayId:null});});
+    (tripData?.itinerary||[]).forEach(d=>(d.activities||[]).forEach(a=>{if(match(a.title))res.push({type:"Activity",icon:"📅",label:a.title,sub:DAYS.find(dy=>dy.id===d.dayId)?.label||"",tab:"itinerary",dayId:d.dayId});}));
+    (tripData?.tripNotes||[]).forEach(n=>{if(match(n.title)||match(n.content))res.push({type:"Note",icon:"📝",label:n.title,sub:n.category,tab:"notes",dayId:null});});
+    (tripData?.packingList||[]).forEach(p=>{if(match(p.item))res.push({type:"Packing",icon:"🎒",label:p.item,sub:p.category,tab:"packing",dayId:null});});
+    (tripData?.checkins||[]).forEach(c=>{if(match(c.item))res.push({type:"Check-in",icon:"☑️",label:c.item,sub:c.assignedTo,tab:"checkins",dayId:null});});
+    (tripData?.quickLinks||[]).forEach(l=>{if(match(l.title)||match(l.description))res.push({type:"Link",icon:"🔗",label:l.title,sub:l.url,tab:"links",dayId:null});});
+    return res.slice(0,12);
+  },[searchQuery,tripData]);
+
+  const handleSearchResult = r=>{
+    setActiveTab(r.tab);
+    if(r.tab==="itinerary"&&r.dayId) setActiveDay(r.dayId);
+    setSearchQuery(""); setShowSearch(false);
+  };
+
+  const handleFAB = type=>{
+    setShowFAB(false);
+    const td=today();
+    const map={
+      expense:{date:td,description:"",amount:"",paidBy:memberNames[0]||"",splitAmong:[...memberNames],category:"Misc",linkedBookingId:""},
+      booking:{type:"Hotel",title:"",confirmationNo:"",date:DAYS[0]?.date||DEFAULT_START,time:"",location:"",cost:"",cancellationPolicy:"",status:"confirmed",linkedDayId:""},
+      task:{title:"",description:"",assignedTo:memberNames[0]||"",dueDate:"",status:"pending",linkedItemType:"",linkedItemId:""},
+      poll:{question:"",options:["",""]},
+      activity:{_dayId:activeDay,time:"09:00",title:"",location:"",notes:""},
+      member:{name:""},
+      note:{title:"",content:"",category:"General"},
+      checkin:{item:"",assignedTo:"Everyone",date:td}
+    };
+    openModal(type,map[type]||{});
+  };
+
+  const getBookingById = id=>(tripData?.bookings||[]).find(b=>b.id===id);
+  const getDayById = id=>DAYS.find(d=>d.id===parseInt(id));
+
   const getReminders = ()=>{
     const list=[];
-    const today = new Date().toISOString().slice(0,10);
-    const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
-    (tripData.bookings||[]).forEach(b=>{
-      if(b.date>=today&&b.date<=tomorrow&&b.status!=="cancelled")
-        list.push({icon:"📅",msg:`Booking: ${b.title} on ${b.date}`});
-    });
-    (tripData.tasks||[]).filter(t=>t.dueDate===today&&t.status!=="done").forEach(t=>{
-      list.push({icon:"✅",msg:`Task due today: ${t.title}`});
-    });
-    if(expenseSummary.settlements.length>0){
-      const twoDaysAgo = new Date(Date.now()-2*86400000).toISOString().slice(0,10);
-      const oldUnsettled = (tripData.expenses||[]).filter(e=>e.date<=twoDaysAgo);
-      if(oldUnsettled.length>0) list.push({icon:"💰",msg:`${expenseSummary.settlements.length} pending settlement(s)`});
+    const td=today();
+    const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
+    (tripData?.bookings||[]).forEach(b=>{if(b.date>=td&&b.date<=tomorrow&&b.status!=="cancelled")list.push({icon:"📅",msg:`Booking: ${b.title} on ${b.date}`});});
+    (tripData?.tasks||[]).filter(t=>t.dueDate===td&&t.status!=="done").forEach(t=>list.push({icon:"⏰",msg:`Task due today: ${t.title}`}));
+    if(expSummary.settlements?.length>0){
+      const old2=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
+      if((tripData?.expenses||[]).some(e=>e.date<=old2))list.push({icon:"💰",msg:`${expSummary.settlements.length} pending settlement(s)`});
     }
-    (tripData.polls||[]).forEach(p=>{
-      const total=Object.values(p.votes||{}).reduce((a,b)=>a+b,0);
-      if(total===0) list.push({icon:"📊",msg:`Poll needs votes: "${p.question.slice(0,40)}…"`});
-    });
+    (tripData?.polls||[]).forEach(p=>{const tv=Object.values(p.votes||{}).reduce((a,b)=>a+b,0);if(tv===0)list.push({icon:"📊",msg:`Poll needs votes: "${(p.question||"").slice(0,30)}…"`});});
     return list;
   };
   const reminders = getReminders();
 
-  // ========== MODAL HELPERS ==========
-  const openModal = (type,init={})=>{ setEditForm(init); setModal({type}); };
-  const closeModal = ()=>{ setModal(null); setEditForm({}); };
-  const setField = (key,val)=>setEditForm(prev=>({...prev,[key]:val}));
+  // Loading / auth gates - MUST BE AFTER ALL HOOKS
+  if(loading) return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div></div>;
+  if(!authUser) return <LoginPage onLogin={u=>{setAuthUser(u);setLoading(true);}}/>;
+  if(!tripData) return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div><div style={{color:"#94a3b8",fontSize:"14px"}}>Loading trip data…</div></div>;
 
-  // ========== HANDLERS — EXISTING ==========
-  const saveExpense = ()=>{
-    const {_editId,date,description,amount,paidBy,splitAmong,category} = editForm;
-    if(!description||!amount||!paidBy||!splitAmong||splitAmong.length===0){ alert("Fill all fields."); return; }
-    const record = {id:_editId||generateId(),date:date||DAYS[0].date,description,amount:parseFloat(amount),paidBy,splitAmong,category:category||"Misc"};
-    const expenses = _editId ? (tripData.expenses||[]).map(e=>e.id===_editId?record:e) : [...(tripData.expenses||[]),record];
-    updateTripData({...tripData,expenses});
+// ========== 7d. CORE HANDLERS (Existing) ==========
+  const saveExpense=()=>{
+    const {_editId,date,description,amount,paidBy,splitAmong,category,linkedBookingId}=editForm;
+    if(!description||!amount||!paidBy||!splitAmong?.length){alert("Fill all required fields.");return;}
+    const rec={id:_editId||generateId(),date:date||DAYS[0].date,description,amount:parseFloat(amount),paidBy,splitAmong,category:category||"Misc",linkedBookingId:linkedBookingId||""};
+    updateTripData({...tripData,expenses:_editId?(tripData.expenses||[]).map(e=>e.id===_editId?rec:e):[...(tripData.expenses||[]),rec]});
     closeModal();
   };
-  const deleteExpense = id=>updateTripData({...tripData,expenses:(tripData.expenses||[]).filter(e=>e.id!==id)});
+  const deleteExpense=id=>updateTripData({...tripData,expenses:(tripData.expenses||[]).filter(e=>e.id!==id)});
 
-  const saveActivity = ()=>{
-    const {_editId,_dayId,time,title,location,notes} = editForm;
-    if(!title){ alert("Enter activity title"); return; }
-    const record = {id:_editId||generateId(),time:time||"12:00",title,location:location||"",notes:notes||""};
-    const updatedItinerary = (tripData.itinerary||[]).map(d=>
-      d.dayId===_dayId ? {...d,activities:sortActivities(_editId?d.activities.map(a=>a.id===_editId?record:a):[...d.activities,record])} : d
-    );
-    updateTripData({...tripData,itinerary:updatedItinerary});
+  const saveActivity=()=>{
+    const {_editId,_dayId,time,title,location,notes}=editForm;
+    if(!title){alert("Enter activity title");return;}
+    const rec={id:_editId||generateId(),time:time||"12:00",title,location:location||"",notes:notes||""};
+    updateTripData({...tripData,itinerary:(tripData.itinerary||[]).map(d=>d.dayId===_dayId?{...d,activities:sortActivities(_editId?d.activities.map(a=>a.id===_editId?rec:a):[...d.activities,rec])}:d)});
     closeModal();
   };
-  const deleteActivity = (dayId,actId)=>{
-    const updatedItinerary=(tripData.itinerary||[]).map(d=>d.dayId===dayId?{...d,activities:d.activities.filter(a=>a.id!==actId)}:d);
-    updateTripData({...tripData,itinerary:updatedItinerary});
-  };
+  const deleteActivity=(dayId,actId)=>updateTripData({...tripData,itinerary:(tripData.itinerary||[]).map(d=>d.dayId===dayId?{...d,activities:d.activities.filter(a=>a.id!==actId)}:d)});
 
-  const savePackingItem = ()=>{
-    const {_editId,category,item} = editForm;
-    if(!item){ alert("Enter item name"); return; }
-    const record = _editId ? {...(tripData.packingList||[]).find(i=>i.id===_editId),category,item} : {id:generateId(),category:category||"Clothing",item,checked:false,assignedTo:null};
-    const packingList = _editId ? (tripData.packingList||[]).map(i=>i.id===_editId?record:i) : [...(tripData.packingList||[]),record];
-    updateTripData({...tripData,packingList});
+  const savePackingItem=()=>{
+    const {_editId,category,item}=editForm;
+    if(!item){alert("Enter item name");return;}
+    const rec=_editId?{...(tripData.packingList||[]).find(i=>i.id===_editId),category,item}:{id:generateId(),category:category||"Clothing",item,checked:false};
+    updateTripData({...tripData,packingList:_editId?(tripData.packingList||[]).map(i=>i.id===_editId?rec:i):[...(tripData.packingList||[]),rec]});
     closeModal();
   };
-  const deletePackingItem = id=>updateTripData({...tripData,packingList:(tripData.packingList||[]).filter(i=>i.id!==id)});
-  const togglePackingItem = id=>{
-    const updated=(tripData.packingList||[]).map(i=>i.id===id?{...i,checked:!i.checked}:i);
-    updateTripData({...tripData,packingList:updated});
-  };
+  const deletePackingItem=id=>updateTripData({...tripData,packingList:(tripData.packingList||[]).filter(i=>i.id!==id)});
+  const togglePacking=id=>updateTripData({...tripData,packingList:(tripData.packingList||[]).map(i=>i.id===id?{...i,checked:!i.checked}:i)});
 
-  const savePoll = ()=>{
-    const {question,options} = editForm;
-    const cleanOpts = (options||[]).filter(o=>o.trim());
-    if(!question||cleanOpts.length<2){ alert("Enter question and at least 2 options"); return; }
-    const votes={}; cleanOpts.forEach(o=>{votes[o]=0;});
-    const poll={id:generateId(),question,options:cleanOpts,votes,createdBy:authUser.username};
-    updateTripData({...tripData,polls:[...(tripData.polls||[]),poll]});
+  const savePoll=()=>{
+    const {question,options}=editForm;
+    const opts=(options||[]).filter(o=>o.trim());
+    if(!question||opts.length<2){alert("Enter question and at least 2 options");return;}
+    const votes={};opts.forEach(o=>{votes[o]=0;});
+    updateTripData({...tripData,polls:[...(tripData.polls||[]),{id:generateId(),question,options:opts,votes,createdBy:authUser.username}]});
     closeModal();
   };
-  const deletePoll = id=>updateTripData({...tripData,polls:(tripData.polls||[]).filter(p=>p.id!==id)});
-  const votePoll = (pollId,option)=>{
-    const updated=(tripData.polls||[]).map(p=>p.id===pollId?{...p,votes:{...p.votes,[option]:(p.votes[option]||0)+1}}:p);
-    updateTripData({...tripData,polls:updated});
-  };
+  const deletePoll=id=>updateTripData({...tripData,polls:(tripData.polls||[]).filter(p=>p.id!==id)});
+  const votePoll=(pid,opt)=>updateTripData({...tripData,polls:(tripData.polls||[]).map(p=>p.id===pid?{...p,votes:{...p.votes,[opt]:(p.votes[opt]||0)+1}}:p)});
 
-  const saveMember = ()=>{
+  const saveMember=()=>{
     const {name}=editForm;
-    if(!name?.trim()){ alert("Enter member name"); return; }
-    if((tripData.members||[]).length>=10){ alert("Max 10 members"); return; }
+    if(!name?.trim()){alert("Enter member name");return;}
+    if((tripData.members||[]).length>=10){alert("Max 10 members");return;}
     updateTripData({...tripData,members:[...(tripData.members||[]),{id:generateId(),name:name.trim(),isAdmin:false}]});
     closeModal();
   };
-  const deleteMember = id=>{
-    if((tripData.members||[]).length<=1){ alert("At least one member required"); return; }
-    updateTripData({...tripData,members:(tripData.members||[]).filter(m=>m.id!==id)});
-  };
+  const deleteMember=id=>{if((tripData.members||[]).length<=1){alert("At least 1 member required");return;}updateTripData({...tripData,members:(tripData.members||[]).filter(m=>m.id!==id)});};
 
-  // ========== HANDLERS — NEW ==========
-  // --- Bookings ---
-  const saveBooking = ()=>{
-    const {_editId,type,title,confirmationNo,date,time,location,cost,cancellationPolicy,status} = editForm;
-    if(!title||!date){ alert("Fill title and date"); return; }
-    const record = {id:_editId||generateId(),type:type||"Hotel",title,confirmationNo:confirmationNo||"",date,time:time||"",location:location||"",cost:parseFloat(cost)||0,cancellationPolicy:cancellationPolicy||"",status:status||"confirmed"};
-    const bookings = [...(_editId?(tripData.bookings||[]).map(b=>b.id===_editId?record:b):[...(tripData.bookings||[]),record])];
-    bookings.sort((a,b)=>a.date.localeCompare(b.date));
-    updateTripData({...tripData,bookings});
+  const saveBooking=()=>{
+    const {_editId,type,title,confirmationNo,date,time,location,cost,cancellationPolicy,status,linkedDayId}=editForm;
+    if(!title||!date){alert("Fill title and date");return;}
+    const rec={id:_editId||generateId(),type:type||"Hotel",title,confirmationNo:confirmationNo||"",date,time:time||"",location:location||"",cost:parseFloat(cost)||0,cancellationPolicy:cancellationPolicy||"",status:status||"confirmed",linkedDayId:linkedDayId||""};
+    const list=[...(_editId?(tripData.bookings||[]).map(b=>b.id===_editId?rec:b):[...(tripData.bookings||[]),rec])];
+    list.sort((a,b)=>a.date.localeCompare(b.date));
+    updateTripData({...tripData,bookings:list}); closeModal();
+  };
+  const deleteBooking=id=>updateTripData({...tripData,bookings:(tripData.bookings||[]).filter(b=>b.id!==id)});
+
+  const saveTask=()=>{
+    const {_editId,title,description,assignedTo,dueDate,status,linkedItemType,linkedItemId}=editForm;
+    if(!title){alert("Enter task title");return;}
+    const rec={id:_editId||generateId(),title,description:description||"",assignedTo:assignedTo||memberNames[0]||"",dueDate:dueDate||"",status:status||"pending",createdBy:authUser.username,linkedItemType:linkedItemType||"",linkedItemId:linkedItemId||""};
+    updateTripData({...tripData,tasks:_editId?(tripData.tasks||[]).map(t=>t.id===_editId?rec:t):[...(tripData.tasks||[]),rec]});
     closeModal();
   };
-  const deleteBooking = id=>updateTripData({...tripData,bookings:(tripData.bookings||[]).filter(b=>b.id!==id)});
+  const deleteTask=id=>updateTripData({...tripData,tasks:(tripData.tasks||[]).filter(t=>t.id!==id)});
+  const setTaskStatus=(id,status)=>updateTripData({...tripData,tasks:(tripData.tasks||[]).map(t=>t.id===id?{...t,status}:t)});
 
-  // --- Tasks ---
-  const saveTask = ()=>{
-    const {_editId,title,description,assignedTo,dueDate,status} = editForm;
-    if(!title){ alert("Enter task title"); return; }
-    const record={id:_editId||generateId(),title,description:description||"",assignedTo:assignedTo||memberNames[0]||"",dueDate:dueDate||"",status:status||"pending",createdBy:authUser.username};
-    const tasks = _editId?(tripData.tasks||[]).map(t=>t.id===_editId?record:t):[...(tripData.tasks||[]),record];
-    updateTripData({...tripData,tasks});
+  const savePassport=()=>{
+    const {_editId,memberName,passportNo,expiry,nationality}=editForm;
+    if(!memberName||!passportNo){alert("Fill required fields");return;}
+    const rec={id:_editId||generateId(),memberName,passportNo,expiry:expiry||"",nationality:nationality||""};
+    const docs=tripData.documents||{};
+    updateTripData({...tripData,documents:{...docs,passports:_editId?(docs.passports||[]).map(p=>p.id===_editId?rec:p):[...(docs.passports||[]),rec]}});
     closeModal();
   };
-  const deleteTask = id=>updateTripData({...tripData,tasks:(tripData.tasks||[]).filter(t=>t.id!==id)});
-  const updateTaskStatus = (id,status)=>{
-    const tasks=(tripData.tasks||[]).map(t=>t.id===id?{...t,status}:t);
-    updateTripData({...tripData,tasks});
-  };
+  const deletePassport=id=>{const docs=tripData.documents||{};updateTripData({...tripData,documents:{...docs,passports:(docs.passports||[]).filter(p=>p.id!==id)}});};
 
-  // --- Documents ---
-  const savePassport = ()=>{
-    const {_editId,memberName,passportNo,expiry,nationality} = editForm;
-    if(!memberName||!passportNo){ alert("Fill required fields"); return; }
-    const record={id:_editId||generateId(),memberName,passportNo,expiry:expiry||"",nationality:nationality||""};
+  const saveEmContact=()=>{
+    const {_editId,name,relationship,phone}=editForm;
+    if(!name||!phone){alert("Fill required fields");return;}
+    const rec={id:_editId||generateId(),name,relationship:relationship||"",phone};
     const docs=tripData.documents||{};
-    const passports=_editId?(docs.passports||[]).map(p=>p.id===_editId?record:p):[...(docs.passports||[]),record];
-    updateTripData({...tripData,documents:{...docs,passports}});
+    updateTripData({...tripData,documents:{...docs,emergencyContacts:_editId?(docs.emergencyContacts||[]).map(c=>c.id===_editId?rec:c):[...(docs.emergencyContacts||[]),rec]}});
     closeModal();
   };
-  const deletePassport = id=>{
-    const docs=tripData.documents||{};
-    updateTripData({...tripData,documents:{...docs,passports:(docs.passports||[]).filter(p=>p.id!==id)}});
-  };
+  const deleteEmContact=id=>{const docs=tripData.documents||{};updateTripData({...tripData,documents:{...docs,emergencyContacts:(docs.emergencyContacts||[]).filter(c=>c.id!==id)}});};
+  const saveInsurance=()=>{const {provider,policyNumber,emergencyPhone,coverageDetails}=editForm;const docs=tripData.documents||{};updateTripData({...tripData,documents:{...docs,insurance:{provider:provider||"",policyNumber:policyNumber||"",emergencyPhone:emergencyPhone||"",coverageDetails:coverageDetails||""}}});closeModal();};
+  const saveMedical=notes=>{const docs=tripData.documents||{};updateTripData({...tripData,documents:{...docs,medicalNotes:notes}});};
 
-  const saveEmContact = ()=>{
-    const {_editId,name,relationship,phone} = editForm;
-    if(!name||!phone){ alert("Fill required fields"); return; }
-    const record={id:_editId||generateId(),name,relationship:relationship||"",phone};
-    const docs=tripData.documents||{};
-    const emergencyContacts=_editId?(docs.emergencyContacts||[]).map(c=>c.id===_editId?record:c):[...(docs.emergencyContacts||[]),record];
-    updateTripData({...tripData,documents:{...docs,emergencyContacts}});
-    closeModal();
-  };
-  const deleteEmContact = id=>{
-    const docs=tripData.documents||{};
-    updateTripData({...tripData,documents:{...docs,emergencyContacts:(docs.emergencyContacts||[]).filter(c=>c.id!==id)}});
-  };
+  const commitBudget=()=>{const t={};EXPENSE_CATEGORIES.forEach(c=>{t[c]=parseFloat(budgetDraft[c])||0;});updateTripData({...tripData,budgetTargets:t});setBudgetEditMode(false);};
 
-  const saveInsurance = ()=>{
-    const {provider,policyNumber,emergencyPhone,coverageDetails} = editForm;
-    const docs=tripData.documents||{};
-    updateTripData({...tripData,documents:{...docs,insurance:{provider:provider||"",policyNumber:policyNumber||"",emergencyPhone:emergencyPhone||"",coverageDetails:coverageDetails||""}}});
-    closeModal();
+  const saveTemplate=()=>{
+    const {templateName}=editForm;
+    if(!templateName?.trim()){alert("Enter template name");return;}
+    const tpl={id:generateId(),name:templateName.trim(),packingList:(tripData.packingList||[]).map(i=>({...i,id:generateId(),checked:false})),budgetTargets:tripData.budgetTargets||{}};
+    updateTripData({...tripData,savedTemplates:[...(tripData.savedTemplates||[]),tpl]}); closeModal();
   };
+  const loadTemplate=id=>{const t=(tripData.savedTemplates||[]).find(x=>x.id===id);if(!t)return;if(window.confirm(`Load "${t.name}"?`))updateTripData({...tripData,packingList:t.packingList,budgetTargets:t.budgetTargets});};
+  const deleteTemplate=id=>updateTripData({...tripData,savedTemplates:(tripData.savedTemplates||[]).filter(t=>t.id!==id)});
 
-  const saveMedicalNotes = notes=>{
-    const docs=tripData.documents||{};
-    updateTripData({...tripData,documents:{...docs,medicalNotes:notes}});
-  };
-
-  // --- Budget targets ---
-  const commitBudgetTargets = ()=>{
-    const targets={};
-    EXPENSE_CATEGORIES.forEach(cat=>{ targets[cat]=parseFloat(budgetDraft[cat])||0; });
-    updateTripData({...tripData,budgetTargets:targets});
-    setBudgetEditMode(false);
-  };
-
-  // --- Templates ---
-  const saveAsTemplate = ()=>{
-    const {templateName} = editForm;
-    if(!templateName?.trim()){ alert("Enter template name"); return; }
-    const template={id:generateId(),name:templateName.trim(),packingList:(tripData.packingList||[]).map(i=>({...i,id:generateId(),checked:false})),budgetTargets:tripData.budgetTargets||{}};
-    updateTripData({...tripData,savedTemplates:[...(tripData.savedTemplates||[]),template]});
-    closeModal();
-  };
-  const loadTemplate = tId=>{
-    const t=(tripData.savedTemplates||[]).find(x=>x.id===tId);
-    if(!t) return;
-    if(window.confirm(`Load template "${t.name}"? Packing list & budget targets will be replaced.`))
-      updateTripData({...tripData,packingList:t.packingList,budgetTargets:t.budgetTargets});
-  };
-  const deleteTemplate = id=>updateTripData({...tripData,savedTemplates:(tripData.savedTemplates||[]).filter(t=>t.id!==id)});
-
-  // --- PDF Export ---
   const exportPDF = type=>{
     let html="";
-    const baseStyle=`font-family:Arial,sans-serif;padding:24px;color:#111;`;
-    const h1=`font-size:24px;margin-bottom:16px;`;
-    const h2=`font-size:18px;margin:16px 0 8px;border-bottom:2px solid #eee;padding-bottom:4px;`;
-
-    if(type==="itinerary"){
-      html=`<div style="${baseStyle}"><h1 style="${h1}">✈️ Trip Itinerary — May 17–26 2026</h1>
-      ${DAYS.map(day=>{
-        const dayData=(tripData.itinerary||[]).find(d=>d.dayId===day.id);
-        const acts=sortActivities(dayData?.activities||[]);
-        return `<div style="margin-bottom:20px"><h2 style="${h2}">${day.label} · ${day.date}</h2>
-        ${acts.length===0?"<p style='color:#888'>No activities</p>":acts.map(a=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px">
-          <strong>${a.time}</strong> — ${a.title}${a.location?` @ ${a.location}`:""}
-          ${a.notes?`<br><em style="color:#555;font-size:13px">${a.notes}</em>`:""}
-        </div>`).join("")}</div>`;
-      }).join("")}</div>`;
-    } else if(type==="packing"){
-      const packed=(tripData.packingList||[]).filter(i=>i.checked).length;
-      const total=(tripData.packingList||[]).length;
-      html=`<div style="${baseStyle}"><h1 style="${h1}">🎒 Packing Checklist — ${packed}/${total} packed</h1>
-      ${PACKING_CATEGORIES.map(cat=>{
-        const items=(tripData.packingList||[]).filter(i=>i.category===cat);
-        if(!items.length) return "";
-        return `<div style="margin-bottom:16px"><h2 style="${h2}">${cat}</h2>
-        ${items.map(i=>`<div style="margin:4px 0">${i.checked?"☑":"☐"} ${i.item}</div>`).join("")}</div>`;
-      }).join("")}</div>`;
-    } else if(type==="expenses"){
-      html=`<div style="${baseStyle}"><h1 style="${h1}">💰 Expense Report</h1>
-      <p><strong>Total Spent:</strong> ₹${fmt(expenseSummary.totalSpent)} &nbsp; <strong>Avg/Person:</strong> ₹${fmt(expenseSummary.avgPerPerson)}</p>
-      <h2 style="${h2}">All Expenses</h2>
-      ${(tripData.expenses||[]).map(e=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px;border-left:3px solid #3b82f6">
-        <strong>${e.description}</strong> — ₹${fmt(e.amount)}<br>
-        <small>${e.date} · Category: ${e.category||"Misc"} · Paid by: ${e.paidBy} · Split: ${(e.splitAmong||[]).join(", ")}</small>
-      </div>`).join("")}
-      <h2 style="${h2}">Settlement Plan</h2>
-      ${expenseSummary.settlements.length===0?"<p>All settled!</p>":expenseSummary.settlements.map(s=>`<div style="margin:6px 0;padding:8px;background:#fff3cd;border-radius:4px">
-        <strong>${s.from}</strong> → pays ₹${fmt(s.amount)} → <strong>${s.to}</strong>
-      </div>`).join("")}</div>`;
-    }
-
-    const el=document.createElement("div");
-    el.innerHTML=html;
-    el.style.position="fixed"; el.style.left="-9999px"; el.style.top="0";
+    const s="font-family:Arial,sans-serif;padding:24px;color:#111;";
+    if(type==="itinerary") {
+      const tripDays = (tripData?.tripStartDate && tripData?.tripEndDate) ? 
+        (() => { const days=[]; let cur=new Date(tripData.tripStartDate); const end=new Date(tripData.tripEndDate); let num=1; while(cur<=end){ days.push({id:num, label:`Day ${num}`, date:cur.toISOString().slice(0,10)}); cur.setDate(cur.getDate()+1); num++; } return days; })() : DAYS;
+      html=`<div style="${s}"><h1>✈️ Trip Itinerary</h1>${tripDays.map(day=>{const dd=(tripData.itinerary||[]).find(d=>d.dayId===day.id);const acts=sortActivities(dd?.activities||[]);return`<div style="margin-bottom:20px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${day.label} · ${day.date}</h2>${acts.map(a=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px"><b>${a.time}</b> — ${a.title}${a.location?` @ ${a.location}`:""}${a.notes?`<br><em style="color:#555">${a.notes}</em>`:""}</div>`).join("")}</div>`;}).join("")}</div>`;
+    } else if(type==="packing") html=`<div style="${s}"><h1>🎒 Packing Checklist</h1>${PACKING_CATEGORIES.map(cat=>{const items=(tripData.packingList||[]).filter(i=>i.category===cat);return items.length?`<div style="margin-bottom:16px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${cat}</h2>${items.map(i=>`<div style="margin:4px 0">${i.checked?"☑":"☐"} ${i.item}</div>`).join("")}</div>`:"";}).join("")}</div>`;
+    else html=`<div style="${s}"><h1>💰 Expense Report</h1><p>Total: ₹${fmt(expSummary.totalSpent)} · Avg/Person: ₹${fmt(expSummary.avgPerPerson)}</p><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">Expenses</h2>${(tripData.expenses||[]).map(e=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px;border-left:3px solid #3b82f6"><b>${e.description}</b> — ₹${fmt(e.amount)}<br><small>${e.date} · ${e.category||"Misc"} · Paid by ${e.paidBy}</small></div>`).join("")}<h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">Settlement</h2>${expSummary.settlements.map(s=>`<div style="margin:6px 0;padding:8px;background:#fff3cd;border-radius:4px"><b>${s.from}</b> → ₹${fmt(s.amount)} → <b>${s.to}</b></div>`).join("")}</div>`;
+    const el=document.createElement("div");el.innerHTML=html;el.style.cssText="position:fixed;left:-9999px;top:0;";
     document.body.appendChild(el);
-    html2pdf().set({margin:10,filename:`trip-${type}.pdf`,jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}}).from(el).save().then(()=>document.body.removeChild(el));
+    html2pdf().set({margin:10,filename:`trip-${type}.pdf`,jsPDF:{unit:"mm",format:"a4"}}).from(el).save().then(()=>document.body.removeChild(el));
   };
+  const resetToDefault=()=>{if(window.confirm("Reset ALL trip data to defaults?"))updateTripData(getDefaultTripData());};
 
-  const resetToDefault = ()=>{
-    if(window.confirm("Reset ALL trip data to defaults? Cannot be undone.")) updateTripData(getDefaultTripData());
+// ========== 7e. NEW HANDLERS (Notes / Quick Links / Check-ins) ==========
+  const saveNote=()=>{
+    const {_editId,title,content,category}=editForm;
+    if(!title?.trim()){alert("Enter a title");return;}
+    const existing=_editId?(tripData.tripNotes||[]).find(n=>n.id===_editId):null;
+    const rec={id:_editId||generateId(),title:title.trim(),content:content||"",category:category||"General",createdBy:authUser.username,createdAt:existing?.createdAt||new Date().toISOString()};
+    updateTripData({...tripData,tripNotes:_editId?(tripData.tripNotes||[]).map(n=>n.id===_editId?rec:n):[...(tripData.tripNotes||[]),rec]});
+    closeModal();
   };
+  const deleteNote=id=>updateTripData({...tripData,tripNotes:(tripData.tripNotes||[]).filter(n=>n.id!==id)});
 
-  // ========== SUB-COMPONENTS ==========
-  const SyncBanner = ()=>isSyncing?<div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6",padding:"4px",background:"rgba(59,130,246,0.1)",borderRadius:"6px",marginBottom:"8px"}}>⏳ Syncing…</div>:null;
+  const saveQuickLink=()=>{
+    const {_editId,title,url,icon,description}=editForm;
+    if(!title?.trim()||!url?.trim()){alert("Enter title and URL");return;}
+    const fullUrl=url.startsWith("http")?url:`https://${url}`;
+    const rec={id:_editId||generateId(),title:title.trim(),url:fullUrl,icon:icon||"🔗",description:description||""};
+    updateTripData({...tripData,quickLinks:_editId?(tripData.quickLinks||[]).map(l=>l.id===_editId?rec:l):[...(tripData.quickLinks||[]),rec]});
+    closeModal();
+  };
+  const deleteQuickLink=id=>updateTripData({...tripData,quickLinks:(tripData.quickLinks||[]).filter(l=>l.id!==id)});
 
-  const WeatherWidget = ()=>{
-    if(weatherLoading) return <div className="section-card" style={{textAlign:"center",padding:"24px",color:"#94a3b8"}}>⛅ Loading weather…</div>;
+  const saveCheckin=()=>{
+    const {_editId,item,assignedTo,date}=editForm;
+    if(!item?.trim()){alert("Enter item");return;}
+    const existing=_editId?(tripData.checkins||[]).find(c=>c.id===_editId):null;
+    const rec={id:_editId||generateId(),item:item.trim(),assignedTo:assignedTo||"Everyone",date:date||"",checked:existing?.checked||false};
+    updateTripData({...tripData,checkins:_editId?(tripData.checkins||[]).map(c=>c.id===_editId?rec:c):[...(tripData.checkins||[]),rec]});
+    closeModal();
+  };
+  const deleteCheckin=id=>updateTripData({...tripData,checkins:(tripData.checkins||[]).filter(c=>c.id!==id)});
+  const toggleCheckin=id=>updateTripData({...tripData,checkins:(tripData.checkins||[]).map(c=>c.id===id?{...c,checked:!c.checked}:c)});
+
+// ========== 7h. RENDER FUNCTIONS ==========
+
+  // ─── Sub-components ───────────────────────────────────────────
+  const WeatherWidget=()=>{
+    if(weatherLoading) return <div className="section-card" style={{textAlign:"center",padding:"24px",color:"#94a3b8"}}>⛅ Loading weather for {tripData.destinationCity||"Mumbai"}…</div>;
     if(!weather) return null;
-    const cur = weather.current_condition?.[0];
+    const cur=weather.current_condition?.[0];
     if(!cur) return null;
-    const tempC = parseInt(cur.temp_C);
-    const desc  = cur.weatherDesc?.[0]?.value||"";
-    const humidity = cur.humidity;
-    const windKph  = cur.windspeedKmph;
-    const forecast = (weather.weather||[]).slice(0,3);
-    const weatherIcons = {"Clear":"☀️","Mainly Clear":"🌤️","Partly Cloudy":"⛅","Overcast":"☁️","Foggy":"🌫️","Light Rain":"🌦️","Rain":"🌧️","Heavy Rain":"⛈️","Thunderstorm":"⛈️","Light Snow":"🌨️","Snow":"❄️","Light Drizzle":"🌦️","Drizzle":"🌧️","Rain Showers":"🌦️","Heavy Showers":"⛈️"};
-    const icon = weatherIcons[desc]||"🌡️";
-
+    const wCode=parseInt(cur.weathercode||0);
+    const icon=WMO_ICONS[wCode]||"🌡️";
+    const forecast=(weather.weather||[]).slice(0,3);
     return(
-      <div style={{background:"linear-gradient(135deg,#1e3a5f 0%,#1e293b 100%)",borderRadius:"12px",padding:"16px",border:"1px solid #1e4a7a"}}>
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#1e293b)",borderRadius:"12px",padding:"16px",border:"1px solid #1e4a7a"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px"}}>
           <div>
-            <div style={{fontSize:"13px",color:"#94a3b8",marginBottom:"4px"}}>📍 {tripData.destinationCity||"Mumbai"}</div>
-            <div style={{fontSize:"40px",lineHeight:1}}>{icon}</div>
-            <div style={{fontSize:"32px",fontWeight:"bold",color:"white",marginTop:"4px"}}>{tempC}°C</div>
-            <div style={{color:"#94a3b8",fontSize:"13px"}}>{desc}</div>
+            <div style={{fontSize:"12px",color:"#94a3b8",marginBottom:"4px"}}>📍 {tripData.destinationCity||"Mumbai"}</div>
+            <div style={{fontSize:"36px",lineHeight:1}}>{icon}</div>
+            <div style={{fontSize:"30px",fontWeight:"bold",color:"white",marginTop:"4px"}}>{cur.temp_C}°C</div>
+            <div style={{color:"#94a3b8",fontSize:"13px"}}>{cur.weatherDesc?.[0]?.value||""}</div>
           </div>
           <div style={{textAlign:"right",fontSize:"12px",color:"#64748b"}}>
-            <div>💧 {humidity}%</div>
-            <div>🌬️ {windKph} km/h</div>
+            <div>💧 {cur.humidity}%</div><div>🌬️ {cur.windspeedKmph} km/h</div>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px"}}>
-          {forecast.map((day,i)=>{
-            const wCode = parseInt(day.hourly?.[4]?.weathercode||0);
-            const desc2 = WMO_CODES[wCode]||"";
-            const fIcon = weatherIcons[desc2]||"🌡️";
-            return(
-              <div key={i} style={{background:"rgba(255,255,255,0.06)",borderRadius:"8px",padding:"8px",textAlign:"center"}}>
-                <div style={{fontSize:"11px",color:"#94a3b8"}}>{day.date?.slice(5)||""}</div>
-                <div style={{fontSize:"20px",margin:"4px 0"}}>{fIcon}</div>
-                <div style={{fontSize:"13px",fontWeight:"bold",color:"white"}}>{day.maxtempC}°</div>
-                <div style={{fontSize:"11px",color:"#64748b"}}>{day.mintempC}°</div>
-              </div>
-            );
-          })}
+          {forecast.map((day,i)=>(
+            <div key={i} style={{background:"rgba(255,255,255,0.06)",borderRadius:"8px",padding:"8px",textAlign:"center"}}>
+              <div style={{fontSize:"11px",color:"#94a3b8"}}>{day.date?.slice(5)||""}</div>
+              <div style={{fontSize:"13px",fontWeight:"bold",color:"white",marginTop:"4px"}}>{day.maxtempC}°</div>
+              <div style={{fontSize:"11px",color:"#64748b"}}>{day.mintempC}°</div>
+            </div>
+          ))}
         </div>
       </div>
     );
   };
 
-  const CountdownWidget = ()=>{
-  const tripStart = tripData?.tripStartDate ? new Date(tripData.tripStartDate) : new Date();
-  const tripEnd = tripData?.tripEndDate ? new Date(tripData.tripEndDate) : new Date();
-  tripStart.setHours(0,0,0,0);
-  tripEnd.setHours(23,59,59,999);
-  const now = new Date(); now.setHours(0,0,0,0);
-  const daysToStart = Math.ceil((tripStart-now)/86400000);
-  const daysToEnd = Math.ceil((tripEnd-now)/86400000);
-  const totalDays = Math.ceil((tripEnd - tripStart) / 86400000) + 1;
-  const currentDayNum = totalDays - daysToEnd;
-  
-  let label,color,sub;
-  if(daysToStart>0){ 
-    label = `Trip starts in ${daysToStart} day${daysToStart!==1?"s":""}!`; 
-    color = "#3b82f6"; 
-    sub = `${tripStart.toLocaleDateString()} – ${tripEnd.toLocaleDateString()}`; 
-  }
-  else if(daysToEnd>=0){ 
-    label = `Day ${currentDayNum} of ${totalDays} — Trip in progress!`; 
-    color = "#10b981"; 
-    sub = `${daysToEnd} day${daysToEnd!==1?"s":""} remaining`; 
-  }
-  else { 
-    label = "Trip has ended"; 
-    color = "#64748b"; 
-    sub = `${tripStart.toLocaleDateString()} – ${tripEnd.toLocaleDateString()}`; 
-  }
-  return(
-    <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px 20px",border:`1px solid ${color}44`,textAlign:"center"}}>
-      <div style={{fontSize:"22px",fontWeight:"bold",color}}>{label}</div>
-      <div style={{fontSize:"12px",color:"#64748b",marginTop:"4px"}}>{sub}</div>
-    </div>
-  );
-};
+  const CountdownWidget=()=>{
+    const start=new Date("2026-05-17"); start.setHours(0,0,0,0);
+    const end  =new Date("2026-05-26"); end.setHours(23,59,59,999);
+    const now  =new Date(); now.setHours(0,0,0,0);
+    const dStart=Math.ceil((start-now)/86400000);
+    const dEnd  =Math.ceil((end-now)/86400000);
+    let label,color,sub;
+    if(dStart>0){label=`Trip starts in ${dStart} day${dStart!==1?"s":""}!`;color="#3b82f6";sub="May 17 – 26, 2026";}
+    else if(dEnd>=0){const dn=Math.min(10,11-dEnd);label=`Day ${dn} of 10 – Trip in progress! 🌴`;color="#10b981";sub=`${dEnd} day${dEnd!==1?"s":""} remaining`;}
+    else{label="Trip has ended";color="#64748b";sub="May 17 – 26, 2026";}
+    return(
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px 20px",border:`1px solid ${color}44`,textAlign:"center"}}>
+        <div style={{fontSize:"20px",fontWeight:"bold",color}}>{label}</div>
+        <div style={{fontSize:"12px",color:"#64748b",marginTop:"4px"}}>{sub}</div>
+      </div>
+    );
+  };
 
-  const RemindersDropdown = ()=>(
+  const TodayAttentionCard=()=>{
+    const td=today();
+    const tom=new Date(Date.now()+86400000).toISOString().slice(0,10);
+    const alerts=[];
+    (tripData.bookings||[]).filter(b=>(b.date===td||b.date===tom)&&b.status!=="cancelled").forEach(b=>alerts.push({icon:"📅",msg:`${b.date===td?"Today":"Tomorrow"}: ${b.title}`,go:()=>setActiveTab("bookings"),btn:"View"}));
+    (tripData.tasks||[]).filter(t=>t.dueDate&&t.dueDate<=td&&t.status!=="done").forEach(t=>alerts.push({icon:t.dueDate<td?"🚨":"⏰",msg:`Task ${t.dueDate<td?"overdue":"due today"}: ${t.title} (${t.assignedTo})`,go:()=>setActiveTab("tasks"),btn:"View"}));
+    if(expSummary.settlements.length>0) alerts.push({icon:"💰",msg:`${expSummary.settlements.length} unsettled expense(s)`,go:()=>setActiveTab("expenses"),btn:"Settle"});
+    (tripData.polls||[]).forEach(p=>{const tv=Object.values(p.votes||{}).reduce((a,b)=>a+b,0);if(tv===0)alerts.push({icon:"📊",msg:`Poll: "${(p.question||"").slice(0,40)}"`,go:()=>setActiveTab("polls"),btn:"Vote"});});
+    (tripData.checkins||[]).filter(c=>c.date===td&&!c.checked).forEach(c=>alerts.push({icon:"☑️",msg:`Check-in today: ${c.item} (${c.assignedTo})`,go:()=>setActiveTab("checkins"),btn:"Mark"}));
+    return(
+      <div style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:alerts.length>0?"1px solid #ef444433":"1px solid #10b98133"}}>
+        <h3 style={{fontWeight:"700",marginBottom:alerts.length?"12px":"0px",color:alerts.length>0?"#f87171":"#10b981",display:"flex",alignItems:"center",gap:"8px"}}>
+          {alerts.length>0?"🔔 Today Needs Attention":"✅ Today's Status"}
+          {alerts.length>0&&<span style={{fontSize:"12px",background:"rgba(239,68,68,0.15)",color:"#ef4444",padding:"2px 8px",borderRadius:"12px",fontWeight:"600"}}>{alerts.length} item{alerts.length!==1?"s":""}</span>}
+        </h3>
+        {alerts.length===0
+          ? <div style={{textAlign:"center",padding:"10px 0",color:"#10b981",fontSize:"16px"}}>🎉 All caught up! Have a great trip!</div>
+          : alerts.map((a,i)=>(
+            <div key={i} className="attention-row">
+              <span style={{fontSize:"20px"}}>{a.icon}</span>
+              <span style={{flex:1,fontSize:"13px",color:"#cbd5e1"}}>{a.msg}</span>
+              <button onClick={a.go} style={{padding:"4px 12px",background:"rgba(59,130,246,0.15)",border:"1px solid #3b82f644",borderRadius:"6px",color:"#60a5fa",fontSize:"12px",fontWeight:"500",flexShrink:0}}>{a.btn} →</button>
+            </div>
+          ))
+        }
+      </div>
+    );
+  };
+
+  const RemindersDropdown=()=>(
     <div className="reminder-dropdown" onClick={e=>e.stopPropagation()}>
       <div style={{padding:"12px 16px",borderBottom:"1px solid #334155",fontWeight:"600",fontSize:"14px"}}>🔔 Reminders ({reminders.length})</div>
       {reminders.length===0
-        ? <div style={{padding:"16px",color:"#64748b",textAlign:"center",fontSize:"13px"}}>All clear! No pending items.</div>
+        ? <div style={{padding:"16px",color:"#64748b",textAlign:"center",fontSize:"13px"}}>All clear!</div>
         : reminders.map((r,i)=>(
           <div key={i} style={{padding:"10px 16px",borderBottom:"1px solid #1e293b",display:"flex",gap:"10px",alignItems:"flex-start"}}>
             <span style={{fontSize:"18px"}}>{r.icon}</span>
@@ -749,141 +686,129 @@ React.useEffect(() => {
     </div>
   );
 
-  // ========== RENDER — DASHBOARD (Trip HQ) ==========
-  const renderDashboard = ()=>{
-    const packedItems  = (tripData.packingList||[]).filter(i=>i.checked).length;
-    const totalItems   = (tripData.packingList||[]).length;
-    const packPct      = totalItems>0?Math.round((packedItems/totalItems)*100):0;
-    const todayStr     = new Date().toISOString().slice(0,10);
-    const todayDayData = (tripData.itinerary||[]).find(d=>d.date===todayStr);
-    const todayActs    = todayDayData ? sortActivities(todayDayData.activities||[]) : [];
-    const pendingTasks = (tripData.tasks||[]).filter(t=>t.assignedTo===authUser.username&&t.status!=="done");
-    const myTasks      = pendingTasks.slice(0,3);
-    const upcomingBookings = (tripData.bookings||[]).filter(b=>b.date>=todayStr&&b.status!=="cancelled").slice(0,3);
-
-    return(
-      <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
-        <SyncBanner />
-        <CountdownWidget />
-
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
-          {[
-            {label:"Members",    value:(tripData.members||[]).length,      color:"#3b82f6"},
-            {label:"Total Spent",value:formatAmt(expenseSummary.totalSpent),color:"#10b981"},
-            {label:"Avg/Person", value:formatAmt(expenseSummary.avgPerPerson),color:"#f59e0b"},
-            {label:"Packed",     value:`${packedItems}/${totalItems}`,     color:"#a78bfa"}
-          ].map(c=>(
-            <div key={c.label} className="stat-card">
-              <div style={{fontSize:"20px",fontWeight:"bold",color:c.color,wordBreak:"break-word"}}>{c.value}</div>
-              <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>{c.label}</div>
+  const FAB=()=>(
+    <div className="fab" onClick={e=>e.stopPropagation()}>
+      {showFAB&&(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"8px"}}>
+          {[["expense","💰 Add Expense"],["booking","📋 Add Booking"],["task","✅ Add Task"],["poll","📊 Add Poll"],["activity","📅 Add Activity"],["member","👤 Add Member"],["note","📝 Add Note"],["checkin","☑️ Add Check-in"]].map(([type,label])=>(
+            <div key={type} className="fab-menu-item">
+              <button className="fab-item-btn" onClick={()=>handleFAB(type)}>{label}</button>
             </div>
           ))}
         </div>
+      )}
+      <button className="fab-main" onClick={()=>setShowFAB(v=>!v)} title="Quick Add">
+        <span style={{transform:showFAB?"rotate(45deg)":"none",display:"inline-block",transition:"transform 0.2s",fontSize:"28px"}}>{showFAB?"×":"+"}</span>
+      </button>
+    </div>
+  );
 
-        <WeatherWidget />
-
-        {/* Today's Agenda */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📅 Today's Agenda {todayActs.length===0&&<span style={{fontSize:"12px",color:"#64748b",fontWeight:"normal"}}>(No trip activities today)</span>}</h3>
-          {todayActs.length===0
-            ? <div style={{color:"#64748b",fontSize:"13px"}}>Enjoy your day! Check the Itinerary tab to plan activities.</div>
-            : todayActs.map((act,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
-                <span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace",minWidth:"48px"}}>{act.time}</span>
-                <span style={{flex:1}}>{act.title}</span>
-                {act.location&&<span style={{fontSize:"11px",color:"#94a3b8"}}>{act.location}</span>}
-              </div>
-            ))
-          }
+  // ─── Dashboard ─────────────────────────────────────────────────
+  const renderDashboard=()=>{
+    const packed=(tripData.packingList||[]).filter(i=>i.checked).length;
+    const total=(tripData.packingList||[]).length;
+    const pct=total>0?Math.round((packed/total)*100):0;
+    const td=today();
+    const todayActs=((tripData.itinerary||[]).find(d=>d.date===td)?.activities||[]);
+    const myTasks=(tripData.tasks||[]).filter(t=>t.assignedTo===authUser.username&&t.status!=="done");
+    const upBookings=(tripData.bookings||[]).filter(b=>b.date>=td&&b.status!=="cancelled").slice(0,3);
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
+        <SyncBanner/>
+        <TodayAttentionCard/>
+        <CountdownWidget/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
+          {[{l:"Members",v:(tripData.members||[]).length,c:"#3b82f6"},{l:"Total Spent",v:fmtAmt(expSummary.totalSpent),c:"#10b981"},{l:"Avg/Person",v:fmtAmt(expSummary.avgPerPerson),c:"#f59e0b"},{l:"Packed",v:`${packed}/${total} (${pct}%)`,c:"#a78bfa"}].map(c=>(
+            <div key={c.l} className="stat-card">
+              <div style={{fontSize:"18px",fontWeight:"bold",color:c.c,wordBreak:"break-word"}}>{c.v}</div>
+              <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>{c.l}</div>
+            </div>
+          ))}
         </div>
-
-        {/* Upcoming Bookings */}
-        {upcomingBookings.length>0&&(
+        <WeatherWidget/>
+        <div className="section-card">
+          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📅 Today's Agenda</h3>
+          {sortActivities(todayActs).length===0?<div style={{color:"#64748b",fontSize:"13px"}}>No activities scheduled today.</div>:sortActivities(todayActs).map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+              <span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace",minWidth:"48px"}}>{a.time}</span>
+              <span style={{flex:1}}>{a.title}</span>
+              {a.location&&<span style={{fontSize:"11px",color:"#94a3b8"}}>{a.location}</span>}
+            </div>
+          ))}
+        </div>
+        {upBookings.length>0&&(
           <div className="section-card">
             <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📋 Upcoming Bookings</h3>
-            {upcomingBookings.map(b=>(
+            {upBookings.map(b=>(
               <div key={b.id} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
-                <span style={{fontSize:"18px"}}>{b.type==="Flight"?"✈️":b.type==="Hotel"?"🏨":b.type==="Train"?"🚂":b.type==="Cab"?"🚕":"📌"}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:"500"}}>{b.title}</div>
-                  <div style={{fontSize:"11px",color:"#94a3b8"}}>{b.date} {b.time&&`· ${b.time}`}</div>
-                </div>
-                <span className={`pill pill-${b.status==="confirmed"?"green":b.status==="pending"?"yellow":"red"}`}>{b.status}</span>
+                <span style={{fontSize:"18px"}}>{TYPE_ICON[b.type]||"📌"}</span>
+                <div style={{flex:1}}><div style={{fontWeight:"500"}}>{b.title}</div><div style={{fontSize:"11px",color:"#94a3b8"}}>{b.date}{b.time&&` · ${b.time}`}</div></div>
+                <span className={`pill ${b.status==="confirmed"?"pill-green":b.status==="pending"?"pill-yellow":"pill-red"}`}>{b.status}</span>
               </div>
             ))}
           </div>
         )}
-
-        {/* My Tasks */}
         {myTasks.length>0&&(
-          <div className="section-card" style={{border:"1px solid #3b82f655"}}>
-            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>✅ My Pending Tasks ({pendingTasks.length})</h3>
-            {myTasks.map(t=>(
+          <div className="section-card" style={{border:"1px solid #3b82f644"}}>
+            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>✅ My Pending Tasks ({myTasks.length})</h3>
+            {myTasks.slice(0,4).map(t=>(
               <div key={t.id} style={{display:"flex",alignItems:"center",gap:"10px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
-                <button onClick={()=>updateTaskStatus(t.id,"done")} style={{background:"none",border:"1px solid #334155",borderRadius:"4px",color:"#64748b",padding:"2px 8px",fontSize:"11px",cursor:"pointer"}}>Done</button>
+                <button onClick={()=>setTaskStatus(t.id,"done")} style={{background:"none",border:"1px solid #334155",borderRadius:"4px",color:"#64748b",padding:"2px 8px",fontSize:"11px"}}>Done</button>
                 <span style={{flex:1,fontSize:"14px"}}>{t.title}</span>
                 {t.dueDate&&<span style={{fontSize:"11px",color:"#f59e0b"}}>📅 {t.dueDate}</span>}
               </div>
             ))}
           </div>
         )}
-
-        {/* Balance Summary */}
         <div className="section-card">
           <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💰 Balance Summary</h3>
           {(tripData.members||[]).map(m=>{
-            const bal=expenseSummary.balance[m.name]||0;
+            const bal=expSummary.balance[m.name]||0;
             return(
               <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}>
-                <span>{m.name}{m.isAdmin&&<span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"4px"}}>(Admin)</span>}</span>
+                <span>{m.name}{m.isAdmin&&<span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"6px"}}>(Admin)</span>}</span>
                 <span style={{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#94a3b8",fontWeight:"600"}}>
-                  {bal>0.01?`+${formatAmt(bal)}`:bal<-0.01?`-${formatAmt(Math.abs(bal))}`:"Settled ✓"}
+                  {bal>0.01?`+${fmtAmt(bal)}`:bal<-0.01?`−${fmtAmt(Math.abs(bal))}`:"Settled ✓"}
                 </span>
               </div>
             );
           })}
         </div>
-
-        {expenseSummary.settlements.length>0&&(
-          <div className="section-card" style={{border:"1px solid #10b981"}}>
+        {expSummary.settlements.length>0&&(
+          <div className="section-card" style={{border:"1px solid #10b98133"}}>
             <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Suggestions</h3>
-            {expenseSummary.settlements.map((s,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px"}}>
+            {expSummary.settlements.map((s,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px",flexWrap:"wrap"}}>
                 <span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span>
                 <span style={{color:"#64748b"}}>→ pays</span>
-                <span style={{color:"#10b981",fontWeight:"700"}}>{formatAmt(s.amount)}</span>
+                <span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(s.amount)}</span>
                 <span style={{color:"#64748b"}}>→</span>
                 <span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span>
               </div>
             ))}
           </div>
         )}
-
-        {/* Packing Progress */}
         <div className="section-card">
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
             <span style={{fontWeight:"600"}}>🎒 Packing Progress</span>
-            <span style={{color:"#a78bfa",fontWeight:"600"}}>{packedItems}/{totalItems} ({packPct}%)</span>
+            <span style={{color:"#a78bfa",fontWeight:"600"}}>{packed}/{total} ({pct}%)</span>
           </div>
-          <div className="progress-bar-wrap">
-            <div className="progress-bar-fill" style={{width:`${packPct}%`,background:"linear-gradient(90deg,#3b82f6,#a78bfa)"}}></div>
-          </div>
+          <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct}%`,background:"linear-gradient(90deg,#3b82f6,#a78bfa)"}}></div></div>
         </div>
       </div>
     );
   };
 
-  // ========== RENDER — ITINERARY (existing, unchanged) ==========
-  const renderItinerary = ()=>{
-    const dayData = (tripData.itinerary||[]).find(d=>d.dayId===activeDay);
-    const activities = sortActivities(dayData?.activities||[]);
+  // ─── Itinerary ─────────────────────────────────────────────────
+  const renderItinerary=()=>{
+    const dayData=(tripData.itinerary||[]).find(d=>d.dayId===activeDay);
+    const acts=sortActivities(dayData?.activities||[]);
     return(
       <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
+        <SyncBanner/>
         <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"8px"}}>
           {DAYS.map(day=>(
-            <button key={day.id} onClick={()=>setActiveDay(day.id)}
-              style={{padding:"8px 14px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background:activeDay===day.id?"#3b82f6":"#1e293b",color:"white",fontSize:"13px"}}>
+            <button key={day.id} onClick={()=>setActiveDay(day.id)} style={{padding:"8px 14px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background:activeDay===day.id?"#3b82f6":"#1e293b",color:"white",fontSize:"13px"}}>
               {day.label} <span style={{fontSize:"11px",opacity:0.7}}>{day.date.slice(5)}</span>
             </button>
           ))}
@@ -893,69 +818,69 @@ React.useEffect(() => {
             <h3 style={{fontWeight:"600"}}>Activities — {currentDay?.label} <span style={{fontSize:"12px",color:"#64748b"}}>({currentDay?.date})</span></h3>
             {isAdmin&&<button onClick={()=>openModal("activity",{_dayId:activeDay,time:"09:00",title:"",location:"",notes:""})} style={{padding:"6px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>+ Add</button>}
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-            {activities.length===0
-              ? <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No activities planned</div>
-              : activities.map(act=>(
-                <div key={act.id} style={{display:"flex",alignItems:"flex-start",gap:"12px",background:"#0f172a",padding:"12px",borderRadius:"8px"}}>
-                  <div style={{color:"#3b82f6",fontFamily:"monospace",fontSize:"13px",minWidth:"52px"}}>{act.time}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:"500"}}>{act.title}</div>
-                    {act.location&&<div style={{fontSize:"12px",color:"#94a3b8",marginTop:"2px"}}>📍 {act.location}</div>}
-                    {act.notes&&<div style={{fontSize:"11px",color:"#64748b",marginTop:"4px"}}>{act.notes}</div>}
-                  </div>
-                  {isAdmin&&(
-                    <div style={{display:"flex",gap:"6px",flexShrink:0}}>
-                      <button onClick={()=>openModal("activity",{_editId:act.id,_dayId:activeDay,time:act.time,title:act.title,location:act.location||"",notes:act.notes||""})} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
-                      <button onClick={()=>deleteActivity(activeDay,act.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"16px"}}>🗑️</button>
-                    </div>
-                  )}
+          {acts.length===0?<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No activities planned</div>:acts.map(act=>(
+            <div key={act.id} style={{display:"flex",alignItems:"flex-start",gap:"12px",background:"#0f172a",padding:"12px",borderRadius:"8px",marginBottom:"10px"}}>
+              <div style={{color:"#3b82f6",fontFamily:"monospace",fontSize:"13px",minWidth:"52px"}}>{act.time}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:"500"}}>{act.title}</div>
+                {act.location&&<div style={{fontSize:"12px",color:"#94a3b8",marginTop:"2px"}}>📍 {act.location}</div>}
+                {act.notes&&<div style={{fontSize:"11px",color:"#64748b",marginTop:"4px"}}>{act.notes}</div>}
+              </div>
+              {isAdmin&&(
+                <div style={{display:"flex",gap:"6px",flexShrink:0}}>
+                  <button onClick={()=>openModal("activity",{_editId:act.id,_dayId:activeDay,time:act.time,title:act.title,location:act.location||"",notes:act.notes||""})} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
+                  <button onClick={()=>deleteActivity(activeDay,act.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"16px"}}>🗑️</button>
                 </div>
-              ))
-            }
-          </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     );
   };
 
-  // ========== RENDER — PACKING (existing, unchanged) ==========
-  const renderPacking = ()=>{
-    const packedCount=(tripData.packingList||[]).filter(i=>i.checked).length;
-    const total=(tripData.packingList||[]).length;
-    const pct=total>0?Math.round((packedCount/total)*100):0;
+  // ─── Bookings ──────────────────────────────────────────────────
+  const renderBookings=()=>{
+    const td=today();
+    const filtered=bookingFilter==="all"?(tripData.bookings||[]):(tripData.bookings||[]).filter(b=>b.type===bookingFilter||b.status===bookingFilter);
+    const sorted=[...filtered].sort((a,b)=>a.date.localeCompare(b.date));
     return(
       <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-        <div className="section-card">
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
-            <span style={{fontWeight:"600"}}>Packing Progress</span>
-            <span style={{color:"#a78bfa",fontWeight:"600"}}>{packedCount}/{total} ({pct}%)</span>
-          </div>
-          <div className="progress-bar-wrap">
-            <div className="progress-bar-fill" style={{width:`${pct}%`,background:"linear-gradient(90deg,#3b82f6,#a78bfa)"}}></div>
-          </div>
+        <SyncBanner/>
+        <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"4px"}}>
+          {["all",...BOOKING_TYPES,...BOOKING_STATUSES].map(f=>(
+            <button key={f} onClick={()=>setBookingFilter(f)} style={{padding:"5px 12px",borderRadius:"20px",border:"none",background:bookingFilter===f?"#3b82f6":"#1e293b",color:bookingFilter===f?"white":"#94a3b8",fontSize:"12px",whiteSpace:"nowrap",textTransform:"capitalize"}}>{f==="all"?"All":f}</button>
+          ))}
         </div>
-        {isAdmin&&<button onClick={()=>openModal("packing",{category:"Clothing",item:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Packing Item</button>}
-        {PACKING_CATEGORIES.map(cat=>{
-          const items=(tripData.packingList||[]).filter(i=>i.category===cat);
-          if(!items.length) return null;
+        {isAdmin&&<button onClick={()=>openModal("booking",{type:"Hotel",title:"",confirmationNo:"",date:DAYS[0].date,time:"",location:"",cost:"",cancellationPolicy:"",status:"confirmed",linkedDayId:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Booking</button>}
+        {sorted.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No bookings yet. Add flights, hotels, and more!</div>}
+        {sorted.map(b=>{
+          const linkedDay=b.linkedDayId?getDayById(b.linkedDayId):null;
           return(
-            <div key={cat} className="section-card">
-              <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>{cat} <span style={{fontSize:"12px",color:"#64748b",fontWeight:"normal"}}>({items.filter(i=>i.checked).length}/{items.length})</span></h3>
-              <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-                {items.map(item=>(
-                  <div key={item.id} style={{display:"flex",alignItems:"center",gap:"12px"}}>
-                    <input type="checkbox" checked={item.checked} onChange={()=>togglePackingItem(item.id)} style={{width:"18px",height:"18px",cursor:"pointer"}} />
-                    <span style={{flex:1,textDecoration:item.checked?"line-through":"none",color:item.checked?"#64748b":"white"}}>{item.item}</span>
-                    {isAdmin&&(
-                      <div style={{display:"flex",gap:"4px"}}>
-                        <button onClick={()=>openModal("packing",{_editId:item.id,category:item.category,item:item.item})} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 7px",fontSize:"12px"}}>✏️</button>
-                        <button onClick={()=>deletePackingItem(item.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:"15px"}}>🗑️</button>
-                      </div>
-                    )}
+            <div key={b.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:b.status==="confirmed"?"1px solid #10b98122":b.status==="pending"?"1px solid #f59e0b22":"1px solid #334155",opacity:b.date<td?0.7:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{display:"flex",gap:"12px",flex:1}}>
+                  <span style={{fontSize:"24px",flexShrink:0}}>{TYPE_ICON[b.type]||"📌"}</span>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap",marginBottom:"4px"}}>
+                      <span style={{fontWeight:"600"}}>{b.title}</span>
+                      <span className={`pill ${b.status==="confirmed"?"pill-green":b.status==="pending"?"pill-yellow":"pill-red"}`}>{b.status}</span>
+                      <span className="pill pill-gray">{b.type}</span>
+                    </div>
+                    <div style={{fontSize:"12px",color:"#94a3b8"}}>📅 {b.date}{b.time&&` · ${b.time}`}</div>
+                    {b.location&&<div style={{fontSize:"12px",color:"#94a3b8",marginTop:"2px"}}>📍 {b.location}</div>}
+                    {b.confirmationNo&&<div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>Ref: <span style={{color:"#a78bfa",fontFamily:"monospace"}}>{b.confirmationNo}</span></div>}
+                    {b.cancellationPolicy&&<div style={{fontSize:"11px",color:"#f59e0b",marginTop:"2px"}}>⚠️ {b.cancellationPolicy}</div>}
+                    {linkedDay&&<button className="link-chip" onClick={()=>{setActiveTab("itinerary");setActiveDay(linkedDay.id);}} style={{marginTop:"6px"}}>📅 {linkedDay.label}</button>}
                   </div>
-                ))}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"8px"}}>
+                  {b.cost>0&&<span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(b.cost)}</span>}
+                  {isAdmin&&<div style={{display:"flex",gap:"6px"}}>
+                    <button onClick={()=>openModal("booking",{_editId:b.id,type:b.type,title:b.title,confirmationNo:b.confirmationNo||"",date:b.date,time:b.time||"",location:b.location||"",cost:String(b.cost||""),cancellationPolicy:b.cancellationPolicy||"",status:b.status,linkedDayId:b.linkedDayId||""})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
+                    <button onClick={()=>deleteBooking(b.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"12px"}}>🗑️</button>
+                  </div>}
+                </div>
               </div>
             </div>
           );
@@ -964,119 +889,338 @@ React.useEffect(() => {
     );
   };
 
-  // ========== RENDER — EXPENSES (enhanced with categories & budget) ==========
-  const renderExpenses = ()=>{
-    const budgetTargets = tripData.budgetTargets||{};
+  // ─── Packing ───────────────────────────────────────────────────
+  const renderPacking=()=>{
+    const packed=(tripData.packingList||[]).filter(i=>i.checked).length;
+    const total=(tripData.packingList||[]).length;
+    const pct=total>0?Math.round((packed/total)*100):0;
     return(
       <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
-          <div className="stat-card"><div style={{fontSize:"22px",fontWeight:"bold",color:"#10b981"}}>{formatAmt(expenseSummary.totalSpent)}</div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Total Spent</div></div>
-          <div className="stat-card"><div style={{fontSize:"22px",fontWeight:"bold",color:"#3b82f6"}}>{formatAmt(expenseSummary.avgPerPerson)}</div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Avg/Person</div></div>
+        <SyncBanner/>
+        <div className="section-card">
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+            <span style={{fontWeight:"600"}}>Packing Progress</span><span style={{color:"#a78bfa",fontWeight:"600"}}>{packed}/{total} ({pct}%)</span>
+          </div>
+          <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct}%`,background:"linear-gradient(90deg,#3b82f6,#a78bfa)"}}></div></div>
         </div>
+        {isAdmin&&<button onClick={()=>openModal("packing",{category:"Clothing",item:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Item</button>}
+        {PACKING_CATEGORIES.map(cat=>{
+          const items=(tripData.packingList||[]).filter(i=>i.category===cat);
+          if(!items.length) return null;
+          return(
+            <div key={cat} className="section-card">
+              <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>{cat} <span style={{fontSize:"12px",color:"#64748b",fontWeight:"normal"}}>({items.filter(i=>i.checked).length}/{items.length})</span></h3>
+              {items.map(item=>(
+                <div key={item.id} style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"8px"}}>
+                  <input type="checkbox" checked={item.checked} onChange={()=>togglePacking(item.id)} style={{width:"18px",height:"18px",cursor:"pointer"}}/>
+                  <span style={{flex:1,textDecoration:item.checked?"line-through":"none",color:item.checked?"#64748b":"white"}}>{item.item}</span>
+                  <span className={`pill ${item.checked?"pill-green":"pill-gray"}`}>{item.checked?"Packed":"Pending"}</span>
+                  {isAdmin&&<div style={{display:"flex",gap:"4px"}}>
+                    <button onClick={()=>openModal("packing",{_editId:item.id,category:item.category,item:item.item})} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 7px",fontSize:"12px"}}>✏️</button>
+                    <button onClick={()=>deletePackingItem(item.id)} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:"15px"}}>🗑️</button>
+                  </div>}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
-        {/* Budget by Category */}
+  // ─── Expenses ──────────────────────────────────────────────────
+  const renderExpenses=()=>{
+    const targets=tripData.budgetTargets||{};
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+          <div className="stat-card"><div style={{fontSize:"20px",fontWeight:"bold",color:"#10b981",wordBreak:"break-word"}}>{fmtAmt(expSummary.totalSpent)}</div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Total Spent</div></div>
+          <div className="stat-card"><div style={{fontSize:"20px",fontWeight:"bold",color:"#3b82f6",wordBreak:"break-word"}}>{fmtAmt(expSummary.avgPerPerson)}</div><div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>Avg/Person</div></div>
+        </div>
         <div className="section-card">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-            <h3 style={{fontWeight:"600"}}>📊 Budget by Category</h3>
-            {isAdmin&&(
-              budgetEditMode
-                ? <div style={{display:"flex",gap:"8px"}}><button onClick={commitBudgetTargets} style={{padding:"4px 12px",background:"#10b981",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Save</button><button onClick={()=>setBudgetEditMode(false)} style={{padding:"4px 12px",background:"#475569",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Cancel</button></div>
-                : <button onClick={()=>{ setBudgetEditMode(true); setBudgetDraft({...budgetTargets}); }} style={{padding:"4px 12px",background:"#475569",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Set Targets</button>
-            )}
+            <h3 style={{fontWeight:"600"}}>📊 Budget vs Actual</h3>
+            {isAdmin&&(budgetEditMode?<div style={{display:"flex",gap:"8px"}}><button onClick={commitBudget} style={{padding:"4px 12px",background:"#10b981",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Save</button><button onClick={()=>setBudgetEditMode(false)} style={{padding:"4px 12px",background:"#475569",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Cancel</button></div>:<button onClick={()=>{setBudgetEditMode(true);setBudgetDraft({...targets});}} style={{padding:"4px 12px",background:"#475569",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Set Targets</button>)}
           </div>
           {EXPENSE_CATEGORIES.map(cat=>{
-            const spent=expenseSummary.byCategory[cat]||0;
-            const target=parseFloat(budgetTargets[cat])||0;
+            const spent=expSummary.byCat[cat]||0;
+            const target=parseFloat(targets[cat])||0;
             const pct=target>0?Math.min(100,Math.round((spent/target)*100)):0;
-            const over=target>0&&spent>=target*0.8;
-            const exceeded=target>0&&spent>target;
+            const over=target>0&&spent>=target*0.8, exceeded=target>0&&spent>target;
             return(
               <div key={cat} style={{marginBottom:"14px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px",fontSize:"13px"}}>
-                  <span style={{fontWeight:"500"}}>{cat} {exceeded&&<span style={{color:"#ef4444",fontSize:"11px"}}> ⚠️ Over budget!</span>}{!exceeded&&over&&<span style={{color:"#f59e0b",fontSize:"11px"}}> ⚡ 80%+ used</span>}</span>
-                  <span style={{color:"#94a3b8"}}>
-                    {formatAmt(spent)}
-                    {target>0&&<span style={{color:exceeded?"#ef4444":over?"#f59e0b":"#64748b"}}> / {formatAmt(target)}</span>}
-                  </span>
+                  <span style={{display:"flex",alignItems:"center",gap:"6px"}}><span className={`pill ${CAT_PILL[cat]||"pill-gray"}`}>{cat}</span>{exceeded&&<span style={{color:"#ef4444",fontSize:"11px"}}>⚠️ Over!</span>}{!exceeded&&over&&<span style={{color:"#f59e0b",fontSize:"11px"}}>⚡80%+</span>}</span>
+                  <span style={{color:"#94a3b8"}}>{fmtAmt(spent)}{target>0&&<span style={{color:exceeded?"#ef4444":over?"#f59e0b":"#64748b"}}> / {fmtAmt(target)}</span>}</span>
                 </div>
-                <div className="progress-bar-wrap">
-                  <div className="progress-bar-fill" style={{width:`${target>0?pct:0}%`,background:exceeded?"#ef4444":over?"#f59e0b":"#3b82f6"}}></div>
-                </div>
-                {budgetEditMode&&isAdmin&&(
-                  <input type="number" placeholder="Set target (₹)" value={budgetDraft[cat]||""} onChange={e=>setBudgetDraft(prev=>({...prev,[cat]:e.target.value}))} style={{width:"100%",marginTop:"6px",padding:"6px",fontSize:"12px"}} />
-                )}
+                <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${target>0?pct:0}%`,background:exceeded?"#ef4444":over?"#f59e0b":"#3b82f6"}}></div></div>
+                {budgetEditMode&&isAdmin&&<input type="number" placeholder="Set target (₹)" value={budgetDraft[cat]||""} onChange={e=>setBudgetDraft(p=>({...p,[cat]:e.target.value}))} style={{width:"100%",marginTop:"6px",padding:"6px",fontSize:"12px"}}/>}
               </div>
             );
           })}
         </div>
-
-        {/* Who Paid */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💳 Who Paid</h3>
-          {(tripData.members||[]).map(m=>(
-            <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}>
-              <span>{m.name}</span>
-              <span style={{fontWeight:"600"}}>{formatAmt(expenseSummary.paidByUser[m.name]||0)}</span>
+        <div className="section-card"><h3 style={{fontWeight:"600",marginBottom:"12px"}}>💳 Who Paid</h3>{(tripData.members||[]).map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span style={{fontWeight:"600"}}>{fmtAmt(expSummary.paidBy[m.name]||0)}</span></div>)}</div>
+        <div className="section-card"><h3 style={{fontWeight:"600",marginBottom:"12px"}}>⚖️ Balances</h3>{(tripData.members||[]).map(m=>{const bal=expSummary.balance[m.name]||0;return(<div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}><span>{m.name}</span><span style={{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#94a3b8",fontWeight:"600"}}>{bal>0.01?`gets ${fmtAmt(bal)}`:bal<-0.01?`owes ${fmtAmt(Math.abs(bal))}`:"Settled ✓"}</span></div>);})}</div>
+        {expSummary.settlements.length>0&&<div className="section-card" style={{border:"1px solid #10b98133"}}><h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Plan</h3>{expSummary.settlements.map((s,i)=><div key={i} style={{padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px",display:"flex",gap:"8px",flexWrap:"wrap"}}><span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span><span style={{color:"#64748b"}}>→ pays</span><span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(s.amount)}</span><span style={{color:"#64748b"}}>→</span><span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span></div>)}</div>}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <h3 style={{fontWeight:"600"}}>📋 Expense History</h3>
+          <button onClick={()=>openModal("expense",{date:today(),description:"",amount:"",paidBy:memberNames[0]||"",splitAmong:[...memberNames],category:"Misc",linkedBookingId:""})} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontWeight:"500"}}>+ Add</button>
+        </div>
+        {(tripData.expenses||[]).length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No expenses yet</div>}
+        {(tripData.expenses||[]).map(exp=>{
+          const lb=exp.linkedBookingId?getBookingById(exp.linkedBookingId):null;
+          return(
+            <div key={exp.id} style={{background:"#0f172a",borderRadius:"8px",padding:"14px",border:"1px solid #334155"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap",marginBottom:"4px"}}><span style={{fontWeight:"500"}}>{exp.description}</span><span className={`pill ${CAT_PILL[exp.category]||"pill-gray"}`}>{exp.category||"Misc"}</span></div>
+                  <div style={{fontSize:"12px",color:"#94a3b8"}}>📅 {exp.date} · Paid by <b>{exp.paidBy}</b></div>
+                  <div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>Split: {(exp.splitAmong||[]).join(", ")}</div>
+                  {lb&&<button className="link-chip" onClick={()=>setActiveTab("bookings")} style={{marginTop:"6px"}}>📋 {lb.title}</button>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"12px"}}>
+                  <span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(exp.amount)}</span>
+                  <div style={{display:"flex",gap:"6px"}}>
+                    <button onClick={()=>openModal("expense",{_editId:exp.id,date:exp.date,description:exp.description,amount:String(exp.amount),paidBy:exp.paidBy,splitAmong:[...(exp.splitAmong||[])],category:exp.category||"Misc",linkedBookingId:exp.linkedBookingId||""})} style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
+                    {isAdmin&&<button onClick={()=>deleteExpense(exp.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"12px"}}>🗑️</button>}
+                  </div>
+                </div>
+              </div>
             </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ─── Tasks ─────────────────────────────────────────────────────
+  const renderTasks=()=>{
+    const all=tripData.tasks||[];
+    const td=today();
+    const list=taskFilter==="mine"?all.filter(t=>t.assignedTo===authUser.username):taskFilter==="pending"?all.filter(t=>t.status==="pending"):taskFilter==="in-progress"?all.filter(t=>t.status==="in-progress"):taskFilter==="done"?all.filter(t=>t.status==="done"):all;
+    const sIcon={pending:"🟡","in-progress":"🔵",done:"✅"};
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div style={{display:"flex",gap:"6px",overflowX:"auto"}}>
+          {[["all","All"],["mine","Mine"],["pending","Pending"],["in-progress","In Progress"],["done","Done"]].map(([id,lbl])=>(
+            <button key={id} onClick={()=>setTaskFilter(id)} style={{padding:"5px 12px",borderRadius:"20px",border:"none",background:taskFilter===id?"#3b82f6":"#1e293b",color:taskFilter===id?"white":"#94a3b8",fontSize:"12px",whiteSpace:"nowrap"}}>{lbl}</button>
           ))}
         </div>
-
-        {/* Balances */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>⚖️ Balances</h3>
-          {(tripData.members||[]).map(m=>{
-            const bal=expenseSummary.balance[m.name]||0;
-            return(
-              <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155"}}>
-                <span>{m.name}</span>
-                <span style={{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#94a3b8",fontWeight:"600"}}>
-                  {bal>0.01?`gets ${formatAmt(bal)}`:bal<-0.01?`owes ${formatAmt(Math.abs(bal))}`:"Settled ✓"}
-                </span>
+        {isAdmin&&<button onClick={()=>openModal("task",{title:"",description:"",assignedTo:memberNames[0]||"",dueDate:"",status:"pending",linkedItemType:"",linkedItemId:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Task</button>}
+        {list.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No tasks here</div>}
+        {list.map(t=>{
+          const overdue=t.dueDate&&t.dueDate<td&&t.status!=="done";
+          const mine=t.assignedTo===authUser.username;
+          const lb=t.linkedItemType==="booking"?getBookingById(t.linkedItemId):null;
+          return(
+            <div key={t.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:mine?"1px solid #3b82f644":overdue?"1px solid #ef444433":"1px solid #334155"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginBottom:"4px"}}>
+                    <span>{sIcon[t.status]||"🟡"}</span>
+                    <span style={{fontWeight:"600",textDecoration:t.status==="done"?"line-through":"none",color:t.status==="done"?"#64748b":"white"}}>{t.title}</span>
+                    <span className={`pill ${t.status==="done"?"pill-green":t.status==="in-progress"?"pill-blue":"pill-gray"}`}>{t.status}</span>
+                    {mine&&<span className="pill pill-blue">Mine</span>}
+                    {overdue&&<span className="pill pill-red">Overdue</span>}
+                  </div>
+                  {t.description&&<div style={{fontSize:"12px",color:"#94a3b8",paddingLeft:"28px",marginBottom:"4px"}}>{t.description}</div>}
+                  <div style={{fontSize:"12px",color:"#64748b",paddingLeft:"28px"}}>👤 {t.assignedTo}{t.dueDate&&<span style={{color:overdue?"#ef4444":"#64748b"}}> · 📅 {t.dueDate}</span>}</div>
+                  {lb&&<button className="link-chip" onClick={()=>setActiveTab("bookings")} style={{marginTop:"6px",marginLeft:"28px"}}>📋 {lb.title}</button>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:"6px",marginLeft:"8px"}}>
+                  {t.status!=="done"&&<select value={t.status} onChange={e=>setTaskStatus(t.id,e.target.value)} style={{fontSize:"12px",padding:"4px 8px",background:"#0f172a",border:"1px solid #334155"}}><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="done">Done</option></select>}
+                  {isAdmin&&<div style={{display:"flex",gap:"4px"}}>
+                    <button onClick={()=>openModal("task",{_editId:t.id,title:t.title,description:t.description||"",assignedTo:t.assignedTo,dueDate:t.dueDate||"",status:t.status,linkedItemType:t.linkedItemType||"",linkedItemId:t.linkedItemId||""})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
+                    <button onClick={()=>deleteTask(t.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>
+                  </div>}
+                </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
-        {expenseSummary.settlements.length>0&&(
-          <div className="section-card" style={{border:"1px solid #10b981"}}>
-            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Plan</h3>
-            {expenseSummary.settlements.map((s,i)=>(
-              <div key={i} style={{padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px"}}>
-                <span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span>
-                <span style={{color:"#64748b"}}> → pays </span>
-                <span style={{color:"#10b981",fontWeight:"700"}}>{formatAmt(s.amount)}</span>
-                <span style={{color:"#64748b"}}> → </span>
-                <span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span>
+  // ─── Documents ─────────────────────────────────────────────────
+  const renderDocuments=()=>{
+    const docs=tripData.documents||{};
+    const dTabs=[{id:"passports",l:"🛂 Passports"},{id:"insurance",l:"🏥 Insurance"},{id:"contacts",l:"📞 Contacts"},{id:"medical",l:"💊 Medical"}];
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div style={{display:"flex",gap:"8px",overflowX:"auto"}}>
+          {dTabs.map(t=><button key={t.id} onClick={()=>setDocSection(t.id)} style={{padding:"8px 14px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background:docSection===t.id?"#3b82f6":"#1e293b",color:docSection===t.id?"white":"#94a3b8",fontSize:"13px"}}>{t.l}</button>)}
+        </div>
+        {docSection==="passports"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+            {isAdmin&&<button onClick={()=>openModal("passport",{memberName:memberNames[0]||"",passportNo:"",expiry:"",nationality:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Passport</button>}
+            {(docs.passports||[]).length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No passport details</div>}
+            {(docs.passports||[]).map(p=>{const near=p.expiry&&Math.ceil((new Date(p.expiry)-new Date())/86400000)<180;return(
+              <div key={p.id} className="section-card" style={{border:near?"1px solid #f59e0b33":"1px solid #334155"}}>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <div><div style={{fontWeight:"600",marginBottom:"4px"}}>🛂 {p.memberName}</div><div style={{fontSize:"13px",color:"#94a3b8"}}>No: <span style={{fontFamily:"monospace",color:"#a78bfa"}}>{p.passportNo}</span></div>{p.nationality&&<div style={{fontSize:"12px",color:"#64748b",marginTop:"2px"}}>{p.nationality}</div>}{p.expiry&&<div style={{fontSize:"12px",color:near?"#f59e0b":"#64748b",marginTop:"2px"}}>Exp: {p.expiry}{near&&" ⚠️"}</div>}</div>
+                  {isAdmin&&<div style={{display:"flex",gap:"6px"}}><button onClick={()=>openModal("passport",{_editId:p.id,memberName:p.memberName,passportNo:p.passportNo,expiry:p.expiry||"",nationality:p.nationality||""})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button><button onClick={()=>deletePassport(p.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button></div>}
+                </div>
+              </div>
+            );})}
+          </div>
+        )}
+        {docSection==="insurance"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+            {isAdmin&&<button onClick={()=>openModal("insurance",{provider:(docs.insurance||{}).provider||"",policyNumber:(docs.insurance||{}).policyNumber||"",emergencyPhone:(docs.insurance||{}).emergencyPhone||"",coverageDetails:(docs.insurance||{}).coverageDetails||""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>{(docs.insurance||{}).provider?"✏️ Edit":"+ Add"} Insurance</button>}
+            {!(docs.insurance||{}).provider?<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No insurance details</div>:<div className="section-card" style={{border:"1px solid #10b98133"}}><div style={{fontWeight:"600",fontSize:"16px",marginBottom:"12px",color:"#10b981"}}>🏥 {docs.insurance.provider}</div>{docs.insurance.policyNumber&&<div style={{fontSize:"13px",color:"#94a3b8",marginBottom:"6px"}}>Policy: <span style={{fontFamily:"monospace",color:"#a78bfa"}}>{docs.insurance.policyNumber}</span></div>}{docs.insurance.emergencyPhone&&<div style={{fontSize:"13px",color:"#94a3b8",marginBottom:"6px"}}>Emergency: <span style={{color:"#ef4444",fontWeight:"600"}}>{docs.insurance.emergencyPhone}</span></div>}{docs.insurance.coverageDetails&&<div style={{fontSize:"12px",color:"#64748b",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>{docs.insurance.coverageDetails}</div>}</div>}
+          </div>
+        )}
+        {docSection==="contacts"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+            <button onClick={()=>openModal("emcontact",{name:"",relationship:"",phone:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Contact</button>
+            {(docs.emergencyContacts||[]).length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No emergency contacts</div>}
+            {(docs.emergencyContacts||[]).map(c=>(
+              <div key={c.id} className="section-card" style={{border:"1px solid #ef444433"}}>
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <div><div style={{fontWeight:"600",marginBottom:"4px"}}>👤 {c.name}</div>{c.relationship&&<div style={{fontSize:"12px",color:"#94a3b8"}}>{c.relationship}</div>}<div style={{fontSize:"14px",color:"#ef4444",fontWeight:"600",marginTop:"4px"}}>📞 {c.phone}</div></div>
+                  <div style={{display:"flex",gap:"6px"}}><button onClick={()=>openModal("emcontact",{_editId:c.id,name:c.name,relationship:c.relationship||"",phone:c.phone})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button><button onClick={()=>deleteEmContact(c.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button></div>
+                </div>
               </div>
             ))}
           </div>
         )}
+        {docSection==="medical"&&<div className="section-card"><h3 style={{fontWeight:"600",marginBottom:"12px"}}>💊 Medical Notes</h3><p style={{fontSize:"12px",color:"#64748b",marginBottom:"8px"}}>Allergies, medications, blood type, conditions</p><textarea value={docs.medicalNotes||""} onChange={e=>saveMedical(e.target.value)} placeholder="e.g. Blood type: O+, Allergic to penicillin…" style={{width:"100%",minHeight:"120px",fontSize:"13px"}}/><p style={{fontSize:"11px",color:"#64748b",marginTop:"6px"}}>Auto-saves on change</p></div>}
+      </div>
+    );
+  };
 
-        {/* Expense List */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <h3 style={{fontWeight:"600"}}>📋 Expense History</h3>
-          <button onClick={()=>openModal("expense",{date:new Date().toISOString().slice(0,10),description:"",amount:"",paidBy:memberNames[0]||"",splitAmong:[...memberNames],category:"Misc"})}
-            style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontWeight:"500"}}>+ Add Expense</button>
-        </div>
-        {(tripData.expenses||[]).length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No expenses yet</div>}
-        {(tripData.expenses||[]).map(exp=>(
-          <div key={exp.id} style={{background:"#0f172a",borderRadius:"8px",padding:"14px",border:"1px solid #334155"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div style={{flex:1}}>
-                <span style={{fontWeight:"500"}}>{exp.description}</span>
-                <span style={{marginLeft:"8px",fontSize:"11px",background:"rgba(59,130,246,0.15)",color:"#3b82f6",padding:"2px 6px",borderRadius:"4px"}}>{exp.category||"Misc"}</span>
-                <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>📅 {exp.date} &nbsp;|&nbsp; Paid by <strong>{exp.paidBy}</strong></div>
-                <div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>Split: {(exp.splitAmong||[]).join(", ")}</div>
+  // ─── Polls ─────────────────────────────────────────────────────
+  const renderPolls=()=>(
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      <SyncBanner/>
+      {isAdmin&&<button onClick={()=>openModal("poll",{question:"",options:["",""]})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Create Poll</button>}
+      {!(tripData.polls||[]).length&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No polls yet</div>}
+      {(tripData.polls||[]).map(poll=>{
+        const tv=Object.values(poll.votes||{}).reduce((a,b)=>a+b,0);
+        const winner=(poll.options||[]).reduce((b,o)=>((poll.votes?.[o]||0)>(poll.votes?.[b]||0)?o:b),(poll.options?.[0]||""));
+        return(
+          <div key={poll.id} className="section-card">
+            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
+              <h3 style={{fontWeight:"600",flex:1}}>{poll.question}</h3>
+              <span className={`pill ${tv===0?"pill-yellow":"pill-green"}`}>{tv===0?"Active – No votes yet":"Live"}</span>
+            </div>
+            {(poll.options||[]).map(opt=>{const votes=poll.votes?.[opt]||0;const pct=tv>0?(votes/tv)*100:0;const win=opt===winner&&tv>0;return(
+              <div key={opt} style={{marginBottom:"12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px",marginBottom:"4px"}}><span style={{color:win?"#10b981":"inherit",fontWeight:win?"600":"normal"}}>{win&&"🏆 "}{opt}</span><span style={{color:"#94a3b8"}}>{votes} vote{votes!==1?"s":""} ({Math.round(pct)}%)</span></div>
+                <div className="progress-bar-wrap" style={{marginBottom:"6px"}}><div className="progress-bar-fill" style={{width:`${pct}%`,background:win?"#10b981":"#3b82f6"}}></div></div>
+                <button onClick={()=>votePoll(poll.id,opt)} style={{padding:"4px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"white",fontSize:"12px"}}>Vote</button>
               </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"12px"}}>
-                <span style={{color:"#10b981",fontWeight:"700",fontSize:"15px"}}>{formatAmt(exp.amount)}</span>
-                <div style={{display:"flex",gap:"6px"}}>
-                  <button onClick={()=>openModal("expense",{_editId:exp.id,date:exp.date,description:exp.description,amount:String(exp.amount),paidBy:exp.paidBy,splitAmong:[...(exp.splitAmong||[])],category:exp.category||"Misc"})}
-                    style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
-                  {isAdmin&&<button onClick={()=>deleteExpense(exp.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer",padding:"3px 6px"}}>🗑️</button>}
+            );})}
+            <div style={{fontSize:"11px",color:"#64748b",marginTop:"8px"}}>Created by {poll.createdBy} · {tv} total vote{tv!==1?"s":""}</div>
+            {isAdmin&&<button onClick={()=>deletePoll(poll.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px"}}>🗑️ Delete</button>}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // ─── Notes (NEW) ───────────────────────────────────────────────
+  const renderNotes=()=>{
+    const notes=tripData.tripNotes||[];
+    const list=noteFilter==="all"?notes:notes.filter(n=>n.category===noteFilter);
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px",flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:"6px",overflowX:"auto",flexWrap:"wrap"}}>
+            {["all",...NOTE_CATEGORIES].map(c=><button key={c} onClick={()=>setNoteFilter(c)} style={{padding:"5px 12px",borderRadius:"20px",border:"none",background:noteFilter===c?"#3b82f6":"#1e293b",color:noteFilter===c?"white":"#94a3b8",fontSize:"12px",whiteSpace:"nowrap"}}>{c==="all"?"All Notes":c}</button>)}
+          </div>
+          <button onClick={()=>openModal("note",{title:"",content:"",category:"General"})} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",fontSize:"13px",flexShrink:0}}>+ Add Note</button>
+        </div>
+        {list.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No notes yet. Start your trip journal! 📝</div>}
+        {list.map(note=>(
+          <div key={note.id} className="section-card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginBottom:"4px"}}>
+                  <span style={{fontWeight:"600",fontSize:"15px"}}>📝 {note.title}</span>
+                  <span className={`pill ${NOTE_PILL[note.category]||"pill-gray"}`}>{note.category}</span>
+                </div>
+                <div style={{fontSize:"11px",color:"#64748b"}}>By {note.createdBy} · {note.createdAt?new Date(note.createdAt).toLocaleDateString("en-IN"):"—"}</div>
+              </div>
+              <div style={{display:"flex",gap:"6px",flexShrink:0}}>
+                <button onClick={()=>openModal("note",{_editId:note.id,title:note.title,content:note.content,category:note.category})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
+                <button onClick={()=>deleteNote(note.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button>
+              </div>
+            </div>
+            {note.content&&<div style={{fontSize:"13px",color:"#cbd5e1",lineHeight:"1.6",background:"#0f172a",padding:"10px",borderRadius:"8px",whiteSpace:"pre-wrap"}}>{note.content}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ─── Quick Links (NEW) ─────────────────────────────────────────
+  const renderQuickLinks=()=>{
+    const links=tripData.quickLinks||[];
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <button onClick={()=>openModal("quicklink",{title:"",url:"",icon:"🔗",description:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Quick Link</button>
+        {links.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No quick links yet. Add maps, booking sites, guides, etc.!</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:"12px"}}>
+          {links.map(link=>(
+            <div key={link.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155",display:"flex",flexDirection:"column",gap:"8px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                <span style={{fontSize:"28px",flexShrink:0}}>{link.icon||"🔗"}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" style={{fontWeight:"600",color:"#60a5fa",textDecoration:"none",fontSize:"14px",display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.title}</a>
+                  <div style={{fontSize:"11px",color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link.url}</div>
                 </div>
               </div>
+              {link.description&&<div style={{fontSize:"12px",color:"#94a3b8"}}>{link.description}</div>}
+              <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
+                <a href={link.url} target="_blank" rel="noopener noreferrer" style={{padding:"4px 12px",background:"rgba(59,130,246,0.15)",border:"1px solid #3b82f644",borderRadius:"6px",color:"#60a5fa",fontSize:"12px",textDecoration:"none"}}>Open ↗</a>
+                <button onClick={()=>openModal("quicklink",{_editId:link.id,title:link.title,url:link.url,icon:link.icon||"🔗",description:link.description||""})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
+                <button onClick={()=>deleteQuickLink(link.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Check-ins (NEW) ───────────────────────────────────────────
+  const renderCheckins=()=>{
+    const all=tripData.checkins||[];
+    const list=checkinFilter==="all"?all:all.filter(c=>c.assignedTo===checkinFilter||c.assignedTo==="Everyone");
+    const done=list.filter(c=>c.checked).length;
+    const pct=list.length>0?Math.round((done/list.length)*100):0;
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div className="section-card">
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}><span style={{fontWeight:"600"}}>Check-in Progress</span><span style={{color:"#10b981",fontWeight:"600"}}>{done}/{list.length} ({pct}%)</span></div>
+          <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct}%`,background:"linear-gradient(90deg,#10b981,#3b82f6)"}}></div></div>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px"}}>
+          <div style={{display:"flex",gap:"6px",overflowX:"auto"}}>
+            {["all",...memberNames].map(m=><button key={m} onClick={()=>setCheckinFilter(m)} style={{padding:"5px 12px",borderRadius:"20px",border:"none",background:checkinFilter===m?"#3b82f6":"#1e293b",color:checkinFilter===m?"white":"#94a3b8",fontSize:"12px",whiteSpace:"nowrap"}}>{m==="all"?"All":m}</button>)}
+          </div>
+          <button onClick={()=>openModal("checkin",{item:"",assignedTo:"Everyone",date:today()})} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",fontSize:"13px",flexShrink:0}}>+ Add Item</button>
+        </div>
+        {list.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No check-in items yet.</div>}
+        {list.map(c=>(
+          <div key={c.id} style={{background:"#1e293b",borderRadius:"10px",padding:"12px 16px",border:"1px solid #334155",display:"flex",alignItems:"center",gap:"12px"}}>
+            <input type="checkbox" checked={c.checked} onChange={()=>toggleCheckin(c.id)} style={{width:"18px",height:"18px",cursor:"pointer",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:"500",textDecoration:c.checked?"line-through":"none",color:c.checked?"#64748b":"white"}}>{c.item}</div>
+              <div style={{fontSize:"12px",color:"#64748b",marginTop:"2px"}}>👤 {c.assignedTo}{c.date&&<span> · 📅 {c.date}</span>}</div>
+            </div>
+            <span className={`pill ${c.checked?"pill-green":"pill-gray"}`}>{c.checked?"Done":"Pending"}</span>
+            <div style={{display:"flex",gap:"4px",flexShrink:0}}>
+              <button onClick={()=>openModal("checkin",{_editId:c.id,item:c.item,assignedTo:c.assignedTo,date:c.date||""})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
+              <button onClick={()=>deleteCheckin(c.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>
             </div>
           </div>
         ))}
@@ -1084,59 +1228,20 @@ React.useEffect(() => {
     );
   };
 
-  // ========== RENDER — POLLS (existing, unchanged) ==========
-  const renderPolls = ()=>(
+  // ─── Members ───────────────────────────────────────────────────
+  const renderMembers=()=>(
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      <SyncBanner />
-      {isAdmin&&<button onClick={()=>openModal("poll",{question:"",options:["",""]})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Create Poll</button>}
-      {(!tripData.polls||tripData.polls.length===0)
-        ? <div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No polls yet</div>
-        : (tripData.polls||[]).map(poll=>{
-          const total=Object.values(poll.votes||{}).reduce((a,b)=>a+b,0);
-          const winner=(poll.options||[]).reduce((best,opt)=>((poll.votes?.[opt]||0)>(poll.votes?.[best]||0)?opt:best),(poll.options?.[0]||""));
-          return(
-            <div key={poll.id} className="section-card">
-              <h3 style={{fontWeight:"600",marginBottom:"12px"}}>{poll.question}</h3>
-              {(poll.options||[]).map(opt=>{
-                const votes=poll.votes?.[opt]||0;
-                const pct=total>0?(votes/total)*100:0;
-                const isWinning=opt===winner&&total>0;
-                return(
-                  <div key={opt} style={{marginBottom:"12px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px",marginBottom:"4px"}}>
-                      <span style={{color:isWinning?"#10b981":"inherit",fontWeight:isWinning?"600":"normal"}}>{isWinning&&"🏆 "}{opt}</span>
-                      <span style={{color:"#94a3b8"}}>{votes} vote{votes!==1?"s":""} ({Math.round(pct)}%)</span>
-                    </div>
-                    <div className="progress-bar-wrap" style={{marginBottom:"6px"}}>
-                      <div className="progress-bar-fill" style={{width:`${pct}%`,background:isWinning?"#10b981":"#3b82f6"}}></div>
-                    </div>
-                    <button onClick={()=>votePoll(poll.id,opt)} style={{padding:"4px 12px",background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"white",fontSize:"12px"}}>Vote</button>
-                  </div>
-                );
-              })}
-              <div style={{fontSize:"11px",color:"#64748b",marginTop:"8px"}}>Created by {poll.createdBy} · {total} total vote{total!==1?"s":""}</div>
-              {isAdmin&&<button onClick={()=>deletePoll(poll.id)} style={{marginTop:"8px",background:"none",border:"none",color:"#ef4444",fontSize:"12px",cursor:"pointer"}}>🗑️ Delete Poll</button>}
-            </div>
-          );
-        })
-      }
-    </div>
-  );
-
-  // ========== RENDER — MEMBERS (existing, unchanged) ==========
-  const renderMembers = ()=>(
-    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-      <SyncBanner />
+      <SyncBanner/>
       {isAdmin&&<button onClick={()=>openModal("member",{name:""})} style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Member</button>}
       {(tripData.members||[]).map(m=>(
         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#1e293b",borderRadius:"12px",padding:"16px",border:"1px solid #334155"}}>
-          <div>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
             <span style={{fontWeight:"500"}}>{m.name}</span>
-            {m.isAdmin&&<span style={{marginLeft:"8px",fontSize:"11px",color:"#f59e0b",background:"rgba(245,158,11,0.1)",padding:"2px 6px",borderRadius:"4px"}}>Admin</span>}
+            {m.isAdmin&&<span className="pill pill-yellow">Admin</span>}
           </div>
           <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-            <span style={{fontSize:"12px",color:expenseSummary.balance[m.name]>0.01?"#10b981":expenseSummary.balance[m.name]<-0.01?"#ef4444":"#64748b"}}>
-              {expenseSummary.balance[m.name]>0.01?`+${formatAmt(expenseSummary.balance[m.name])}`:expenseSummary.balance[m.name]<-0.01?`-${formatAmt(Math.abs(expenseSummary.balance[m.name]))}`:"Settled"}
+            <span style={{fontSize:"12px",color:expSummary.balance[m.name]>0.01?"#10b981":expSummary.balance[m.name]<-0.01?"#ef4444":"#64748b"}}>
+              {expSummary.balance[m.name]>0.01?`+${fmtAmt(expSummary.balance[m.name])}`:expSummary.balance[m.name]<-0.01?`−${fmtAmt(Math.abs(expSummary.balance[m.name]))}`:"Settled"}
             </span>
             {isAdmin&&!m.isAdmin&&<button onClick={()=>deleteMember(m.id)} style={{padding:"6px 12px",background:"#ef4444",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Remove</button>}
           </div>
@@ -1145,518 +1250,98 @@ React.useEffect(() => {
     </div>
   );
 
-  // ========== RENDER — BOOKINGS (NEW) ==========
-  const renderBookings = ()=>{
-    const today=new Date().toISOString().slice(0,10);
-    const allBookings=tripData.bookings||[];
-    const filtered = bookingFilter==="all" ? allBookings : allBookings.filter(b=>b.type===bookingFilter||b.status===bookingFilter);
-    const sorted=[...filtered].sort((a,b)=>a.date.localeCompare(b.date));
-
-    const typeIcon = t=>({Flight:"✈️",Hotel:"🏨",Train:"🚂",Cab:"🚕",Activity:"🎯",Other:"📌"}[t]||"📌");
-
-    return(
-      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-        <div style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"4px"}}>
-          {["all",...BOOKING_TYPES,...BOOKING_STATUSES].map(f=>(
-            <button key={f} onClick={()=>setBookingFilter(f)}
-              style={{padding:"6px 12px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background:bookingFilter===f?"#3b82f6":"#1e293b",color:bookingFilter===f?"white":"#94a3b8",fontSize:"12px",textTransform:"capitalize"}}>
-              {f==="all"?"All Bookings":f}
-            </button>
-          ))}
-        </div>
-        {isAdmin&&<button onClick={()=>openModal("booking",{type:"Hotel",title:"",confirmationNo:"",date:DAYS[0].date,time:"",location:"",cost:"",cancellationPolicy:"",status:"confirmed"})}
-          style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Booking</button>}
-        {sorted.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No bookings yet. Add your flights, hotels, and more!</div>}
-        {sorted.map(b=>{
-          const isPast=b.date<today;
-          return(
-            <div key={b.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:`1px solid ${b.status==="cancelled"?"#334155":b.status==="confirmed"?"#10b98133":"#f59e0b33"}`,opacity:isPast?0.7:1}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{display:"flex",gap:"12px",alignItems:"flex-start",flex:1}}>
-                  <span style={{fontSize:"28px"}}>{typeIcon(b.type)}</span>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                      <span style={{fontWeight:"600",fontSize:"15px"}}>{b.title}</span>
-                      <span className={`pill ${STATUS_PILL_CLASS[b.status]||"pill-gray"}`}>{b.status}</span>
-                      <span style={{fontSize:"11px",color:"#64748b"}}>{b.type}</span>
-                    </div>
-                    <div style={{fontSize:"12px",color:"#94a3b8"}}>📅 {b.date} {b.time&&`· ${b.time}`}</div>
-                    {b.location&&<div style={{fontSize:"12px",color:"#94a3b8",marginTop:"2px"}}>📍 {b.location}</div>}
-                    {b.confirmationNo&&<div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>Ref: <span style={{color:"#a78bfa",fontFamily:"monospace"}}>{b.confirmationNo}</span></div>}
-                    {b.cancellationPolicy&&<div style={{fontSize:"11px",color:"#f59e0b",marginTop:"2px"}}>⚠️ {b.cancellationPolicy}</div>}
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"8px"}}>
-                  {b.cost>0&&<span style={{color:"#10b981",fontWeight:"700"}}>{formatAmt(b.cost)}</span>}
-                  {isAdmin&&(
-                    <div style={{display:"flex",gap:"6px"}}>
-                      <button onClick={()=>openModal("booking",{_editId:b.id,type:b.type,title:b.title,confirmationNo:b.confirmationNo||"",date:b.date,time:b.time||"",location:b.location||"",cost:String(b.cost||""),cancellationPolicy:b.cancellationPolicy||"",status:b.status})}
-                        style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
-                      <button onClick={()=>deleteBooking(b.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"12px"}}>🗑️</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // ========== RENDER — DOCUMENTS (NEW) ==========
-  const renderDocuments = ()=>{
-    const docs=tripData.documents||{};
-    const passports=docs.passports||[];
-    const insurance=docs.insurance||{};
-    const contacts=docs.emergencyContacts||[];
-    const medNotes=docs.medicalNotes||"";
-    const [notesDraft,setNotesDraft] = [medNotes, txt=>saveMedicalNotes(txt)];
-
-    const docTabs=[
-      {id:"passports",label:"🛂 Passports"},
-      {id:"insurance",label:"🏥 Insurance"},
-      {id:"contacts",label:"📞 Contacts"},
-      {id:"medical",label:"💊 Medical"}
-    ];
-
-    return(
-      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-        <div style={{display:"flex",gap:"8px",overflowX:"auto"}}>
-          {docTabs.map(t=>(
-            <button key={t.id} onClick={()=>setDocSection(t.id)}
-              style={{padding:"8px 14px",borderRadius:"8px",whiteSpace:"nowrap",border:"none",background:docSection===t.id?"#3b82f6":"#1e293b",color:docSection===t.id?"white":"#94a3b8",fontSize:"13px"}}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {docSection==="passports"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-            {isAdmin&&<button onClick={()=>openModal("passport",{memberName:memberNames[0]||"",passportNo:"",expiry:"",nationality:""})}
-              style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Passport</button>}
-            {passports.length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No passport details added</div>}
-            {passports.map(p=>{
-              const expiry=p.expiry?new Date(p.expiry):null;
-              const today=new Date();
-              const daysToExpiry=expiry?Math.ceil((expiry-today)/86400000):null;
-              const nearExpiry=daysToExpiry!==null&&daysToExpiry<180;
-              return(
-                <div key={p.id} className="section-card" style={{border:nearExpiry?"1px solid #f59e0b33":"1px solid #334155"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div>
-                      <div style={{fontWeight:"600",marginBottom:"4px"}}>🛂 {p.memberName}</div>
-                      <div style={{fontSize:"13px",color:"#94a3b8"}}>Passport: <span style={{fontFamily:"monospace",color:"#a78bfa"}}>{p.passportNo}</span></div>
-                      {p.nationality&&<div style={{fontSize:"12px",color:"#64748b",marginTop:"2px"}}>Nationality: {p.nationality}</div>}
-                      {p.expiry&&<div style={{fontSize:"12px",color:nearExpiry?"#f59e0b":"#64748b",marginTop:"2px"}}>Expires: {p.expiry}{nearExpiry&&" ⚠️ Expiring soon!"}</div>}
-                    </div>
-                    {isAdmin&&(
-                      <div style={{display:"flex",gap:"6px"}}>
-                        <button onClick={()=>openModal("passport",{_editId:p.id,memberName:p.memberName,passportNo:p.passportNo,expiry:p.expiry||"",nationality:p.nationality||""})}
-                          style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
-                        <button onClick={()=>deletePassport(p.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {docSection==="insurance"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-            {isAdmin&&<button onClick={()=>openModal("insurance",{provider:insurance.provider||"",policyNumber:insurance.policyNumber||"",emergencyPhone:insurance.emergencyPhone||"",coverageDetails:insurance.coverageDetails||""})}
-              style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>{insurance.provider?"✏️ Edit Insurance":"+ Add Insurance"}</button>}
-            {!insurance.provider
-              ? <div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No insurance details added</div>
-              : <div className="section-card" style={{border:"1px solid #10b98133"}}>
-                  <div style={{fontWeight:"600",fontSize:"16px",marginBottom:"12px",color:"#10b981"}}>🏥 {insurance.provider}</div>
-                  {insurance.policyNumber&&<div style={{fontSize:"13px",color:"#94a3b8",marginBottom:"6px"}}>Policy No: <span style={{fontFamily:"monospace",color:"#a78bfa"}}>{insurance.policyNumber}</span></div>}
-                  {insurance.emergencyPhone&&<div style={{fontSize:"13px",color:"#94a3b8",marginBottom:"6px"}}>Emergency: <span style={{color:"#ef4444",fontWeight:"600"}}>{insurance.emergencyPhone}</span></div>}
-                  {insurance.coverageDetails&&<div style={{fontSize:"12px",color:"#64748b",marginTop:"8px",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>{insurance.coverageDetails}</div>}
-                </div>
-            }
-          </div>
-        )}
-
-        {docSection==="contacts"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-            <button onClick={()=>openModal("emcontact",{name:"",relationship:"",phone:""})}
-              style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Emergency Contact</button>
-            {contacts.length===0&&<div style={{textAlign:"center",padding:"30px",color:"#64748b"}}>No emergency contacts added</div>}
-            {contacts.map(c=>(
-              <div key={c.id} className="section-card" style={{border:"1px solid #ef444433"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div>
-                    <div style={{fontWeight:"600",marginBottom:"4px"}}>👤 {c.name}</div>
-                    {c.relationship&&<div style={{fontSize:"12px",color:"#94a3b8"}}>{c.relationship}</div>}
-                    <div style={{fontSize:"14px",color:"#ef4444",fontWeight:"600",marginTop:"4px"}}>📞 {c.phone}</div>
-                  </div>
-                  <div style={{display:"flex",gap:"6px"}}>
-                    <button onClick={()=>openModal("emcontact",{_editId:c.id,name:c.name,relationship:c.relationship||"",phone:c.phone})}
-                      style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
-                    <button onClick={()=>deleteEmContact(c.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {docSection==="medical"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-            <div className="section-card">
-              <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💊 Medical Notes</h3>
-              <p style={{fontSize:"12px",color:"#64748b",marginBottom:"8px"}}>Allergies, medications, blood type, special conditions</p>
-              <textarea
-                value={medNotes}
-                onChange={e=>saveMedicalNotes(e.target.value)}
-                placeholder="e.g. Blood type: O+, Allergic to penicillin, Takes metformin daily..."
-                style={{width:"100%",minHeight:"120px",fontSize:"13px"}}
-              />
-              <p style={{fontSize:"11px",color:"#64748b",marginTop:"6px"}}>Changes auto-save</p>
+  // ─── Settings ──────────────────────────────────────────────────
+  const renderSettings=()=>(
+    <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+      <SyncBanner/>
+      <div className="section-card"><h3 style={{fontWeight:"600",marginBottom:"8px"}}>👤 Account</h3><p style={{color:"#94a3b8",fontSize:"14px"}}>{authUser.username} ({authUser.role})</p></div>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💱 Currency & Destination</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Destination City (weather)</label>
+            <div style={{display:"flex",gap:"8px"}}>
+              <input value={destCityDraft} onChange={e=>setDestCityDraft(e.target.value)} placeholder="e.g. Goa, Bangkok, Dubai" style={{flex:1}}/>
+              <button onClick={()=>updateTripData({...tripData,destinationCity:destCityDraft})} style={{padding:"8px 14px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontSize:"13px",fontWeight:"500"}}>Set</button>
             </div>
           </div>
-        )}
+          <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Trip Currency</label>
+            <select value={tripCurrency} onChange={e=>updateTripData({...tripData,tripCurrency:e.target.value})} style={{width:"100%"}}>
+              {CURRENCIES.map(c=><option key={c} value={c}>{c} ({CURRENCY_SYMBOLS[c]||c})</option>)}
+            </select>
+          </div>
+          {tripCurrency!=="INR"&&<div style={{fontSize:"12px",color:"#94a3b8",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>📈 1 INR ≈ {fmtD(exchangeRate)} {tripCurrency} · Frankfurter API</div>}
+        </div>
       </div>
-    );
-  };
-
-  // ========== RENDER — TASKS (NEW) ==========
-  const renderTasks = ()=>{
-    const allTasks=tripData.tasks||[];
-    const myTasks=allTasks.filter(t=>t.assignedTo===authUser.username);
-    const displayTasks = taskFilter==="mine"?myTasks:taskFilter==="pending"?allTasks.filter(t=>t.status==="pending"):taskFilter==="done"?allTasks.filter(t=>t.status==="done"):allTasks;
-    const statusIcon={pending:"🟡","in-progress":"🔵",done:"✅"};
-    const today=new Date().toISOString().slice(0,10);
-
-    return(
-      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-        <div style={{display:"flex",gap:"8px",overflowX:"auto"}}>
-          {[["all","All Tasks"],["mine","My Tasks"],["pending","Pending"],["done","Done"]].map(([id,label])=>(
-            <button key={id} onClick={()=>setTaskFilter(id)}
-              style={{padding:"6px 14px",borderRadius:"8px",border:"none",background:taskFilter===id?"#3b82f6":"#1e293b",color:taskFilter===id?"white":"#94a3b8",fontSize:"13px"}}>
-              {label}
-            </button>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📊 Trip Stats</h3>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",fontSize:"14px",color:"#94a3b8"}}>
+          {[["Members",(tripData.members||[]).length],["Expenses",(tripData.expenses||[]).length],["Bookings",(tripData.bookings||[]).length],["Tasks",(tripData.tasks||[]).length],["Notes",(tripData.tripNotes||[]).length],["Check-ins",(tripData.checkins||[]).length],["Links",(tripData.quickLinks||[]).length],["Polls",(tripData.polls||[]).length]].map(([k,v])=>(
+            <div key={k}>{k}: <strong style={{color:"white"}}>{v}</strong></div>
           ))}
         </div>
-        {isAdmin&&(
-          <button onClick={()=>openModal("task",{title:"",description:"",assignedTo:memberNames[0]||"",dueDate:"",status:"pending"})}
-            style={{padding:"10px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>+ Add Task</button>
-        )}
-        {displayTasks.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No tasks here</div>}
-        {displayTasks.map(t=>{
-          const isOverdue=t.dueDate&&t.dueDate<today&&t.status!=="done";
-          const isMine=t.assignedTo===authUser.username;
-          return(
-            <div key={t.id} style={{background:"#1e293b",borderRadius:"12px",padding:"16px",border:isMine?"1px solid #3b82f655":isOverdue?"1px solid #ef444433":"1px solid #334155"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                    <span>{statusIcon[t.status]||"🟡"}</span>
-                    <span style={{fontWeight:"600",fontSize:"15px",textDecoration:t.status==="done"?"line-through":"none",color:t.status==="done"?"#64748b":"white"}}>{t.title}</span>
-                    {isMine&&<span style={{fontSize:"10px",color:"#3b82f6",background:"rgba(59,130,246,0.15)",padding:"2px 6px",borderRadius:"4px"}}>Mine</span>}
-                    {isOverdue&&<span style={{fontSize:"10px",color:"#ef4444",background:"rgba(239,68,68,0.15)",padding:"2px 6px",borderRadius:"4px"}}>Overdue</span>}
-                  </div>
-                  {t.description&&<div style={{fontSize:"12px",color:"#94a3b8",marginBottom:"4px",paddingLeft:"28px"}}>{t.description}</div>}
-                  <div style={{paddingLeft:"28px",fontSize:"12px",color:"#64748b"}}>
-                    👤 {t.assignedTo} {t.dueDate&&<span style={{color:isOverdue?"#ef4444":"#64748b"}}> · 📅 {t.dueDate}</span>}
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:"6px",marginLeft:"8px"}}>
-                  {t.status!=="done"&&(
-                    <select value={t.status} onChange={e=>updateTaskStatus(t.id,e.target.value)} style={{fontSize:"12px",padding:"4px 8px",background:"#0f172a",border:"1px solid #334155"}}>
-                      <option value="pending">Pending</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="done">Done</option>
-                    </select>
-                  )}
-                  {isAdmin&&(
-                    <div style={{display:"flex",gap:"4px"}}>
-                      <button onClick={()=>openModal("task",{_editId:t.id,title:t.title,description:t.description||"",assignedTo:t.assignedTo,dueDate:t.dueDate||"",status:t.status})}
-                        style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"3px 8px",fontSize:"12px"}}>✏️</button>
-                      <button onClick={()=>deleteTask(t.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
-    );
-  };
-
-  // ========== RENDER — SETTINGS (enhanced) ==========
-  const renderSettings = ()=>{
-    const templates=tripData.savedTemplates||[];
-    return(
-      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
-        <SyncBanner />
-
-        {/* Account */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"8px"}}>👤 Account</h3>
-          <p style={{color:"#94a3b8",fontSize:"14px"}}>{authUser.username} ({authUser.role})</p>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📄 Export as PDF</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+          <button onClick={()=>exportPDF("itinerary")} style={{padding:"10px",background:"#1e40af",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>📅 Export Itinerary</button>
+          <button onClick={()=>exportPDF("packing")}   style={{padding:"10px",background:"#6d28d9",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>🎒 Export Packing List</button>
+          <button onClick={()=>exportPDF("expenses")}  style={{padding:"10px",background:"#065f46",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>💰 Export Expense Report</button>
         </div>
-{/* Trip Dates */}
-<div className="section-card">
-  <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📅 Trip Dates</h3>
-  <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-    <div>
-      <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Start Date</label>
-      <input 
-        type="date" 
-        value={tripData.tripStartDate || ""} 
-        onChange={e => {
-          const newStart = e.target.value;
-          const newEnd = tripData.tripEndDate;
-          if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
-            alert("Start date cannot be after end date");
-            return;
-          }
-          updateTripData({...tripData, tripStartDate: newStart});
-        }}
-        style={{width:"100%"}}
-      />
+      </div>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📁 Trip Templates</h3>
+        {isAdmin&&<button onClick={()=>openModal("template",{templateName:""})} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",marginBottom:"12px",width:"100%"}}>💾 Save Current as Template</button>}
+        {(tripData.savedTemplates||[]).length===0&&<div style={{color:"#64748b",fontSize:"13px"}}>No saved templates</div>}
+        {(tripData.savedTemplates||[]).map(t=>(
+          <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px",background:"#0f172a",borderRadius:"8px",marginBottom:"8px"}}>
+            <span style={{fontWeight:"500"}}>{t.name}</span>
+            <div style={{display:"flex",gap:"8px"}}>
+              {isAdmin&&<button onClick={()=>loadTemplate(t.id)} style={{padding:"4px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Load</button>}
+              {isAdmin&&<button onClick={()=>deleteTemplate(t.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🗃️ Data</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+          {isAdmin&&<button onClick={resetToDefault} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🔄 Reset to Default</button>}
+          <button onClick={handleLogout} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🚪 Sign Out</button>
+        </div>
+      </div>
+      <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"8px"}}>Trip Planner PRO · Firebase · Weather: wttr.in · FX: Frankfurter</div>
     </div>
-    <div>
-      <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>End Date</label>
-      <input 
-        type="date" 
-        value={tripData.tripEndDate || ""} 
-        onChange={e => {
-          const newEnd = e.target.value;
-          const newStart = tripData.tripStartDate;
-          if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
-            alert("End date cannot be before start date");
-            return;
-          }
-          updateTripData({...tripData, tripEndDate: newEnd});
-        }}
-        style={{width:"100%"}}
-      />
-    </div>
-    <div style={{fontSize:"12px",color:"#64748b",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>
-      📍 Trip duration: {tripData.tripStartDate && tripData.tripEndDate ? 
-        `${Math.ceil((new Date(tripData.tripEndDate) - new Date(tripData.tripStartDate)) / 86400000) + 1} days` : 
-        "Set dates above"}
-    </div>
-  </div>
-</div>
+  );
 
-        {/* Trip Currency */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💱 Currency & Destination</h3>
-          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-            <div>
-              <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Destination City (for weather)</label>
-              <input type="text" value={editForm._destCity!==undefined?editForm._destCity:(tripData.destinationCity||"Mumbai")}
-                onChange={e=>setField("_destCity",e.target.value)}
-                onBlur={()=>{ if(editForm._destCity!==undefined) updateTripData({...tripData,destinationCity:editForm._destCity}); }}
-                placeholder="e.g. Goa, Bangkok, Dubai" style={{width:"100%"}} />
-            </div>
-            <div>
-              <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Trip Currency (destination)</label>
-              <select value={tripCurrency} onChange={e=>updateTripData({...tripData,tripCurrency:e.target.value})} style={{width:"100%"}}>
-                {CURRENCIES.map(c=><option key={c} value={c}>{c} {c!=="INR"?`(${CURRENCY_SYMBOLS[c]})`:""}</option>)}
-              </select>
-            </div>
-            {tripCurrency!=="INR"&&(
-              <div style={{fontSize:"12px",color:"#94a3b8",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>
-                📈 Rate: 1 INR ≈ {fmtD(exchangeRate)} {tripCurrency} · Powered by Frankfurter API
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Trip Stats */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📊 Trip Stats</h3>
-          <div style={{display:"flex",flexDirection:"column",gap:"6px",fontSize:"14px",color:"#94a3b8"}}>
-            <div>Members: <strong style={{color:"white"}}>{(tripData.members||[]).length}</strong></div>
-            <div>Total expenses: <strong style={{color:"white"}}>{(tripData.expenses||[]).length}</strong></div>
-            <div>Packing items: <strong style={{color:"white"}}>{(tripData.packingList||[]).length}</strong></div>
-            <div>Bookings: <strong style={{color:"white"}}>{(tripData.bookings||[]).length}</strong></div>
-            <div>Tasks: <strong style={{color:"white"}}>{(tripData.tasks||[]).length}</strong></div>
-            <div>Polls: <strong style={{color:"white"}}>{(tripData.polls||[]).length}</strong></div>
-          </div>
-        </div>
-
-        {/* PDF Export */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📄 Export as PDF</h3>
-          <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-            <button onClick={()=>exportPDF("itinerary")} style={{padding:"10px",background:"#1e40af",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>📅 Export Itinerary</button>
-            <button onClick={()=>exportPDF("packing")}   style={{padding:"10px",background:"#6d28d9",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>🎒 Export Packing List</button>
-            <button onClick={()=>exportPDF("expenses")}  style={{padding:"10px",background:"#065f46",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>💰 Export Expense Report</button>
-          </div>
-        </div>
-
-        {/* Templates */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📁 Trip Templates</h3>
-          {isAdmin&&(
-            <button onClick={()=>openModal("template",{templateName:""})} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",marginBottom:"12px",width:"100%"}}>
-              💾 Save Current as Template
-            </button>
-          )}
-          {templates.length===0&&<div style={{color:"#64748b",fontSize:"13px"}}>No saved templates yet</div>}
-          {templates.map(t=>(
-            <div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px",background:"#0f172a",borderRadius:"8px",marginBottom:"8px"}}>
-              <span style={{fontWeight:"500"}}>{t.name}</span>
-              <div style={{display:"flex",gap:"8px"}}>
-                {isAdmin&&<button onClick={()=>loadTemplate(t.id)} style={{padding:"4px 12px",background:"#3b82f6",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>Load</button>}
-                {isAdmin&&<button onClick={()=>deleteTemplate(t.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"13px"}}>🗑️</button>}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Data Management */}
-        <div className="section-card">
-          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🗃️ Data Management</h3>
-          <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
-            {isAdmin&&<button onClick={resetToDefault} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🔄 Reset to Default Data</button>}
-            <button onClick={handleLogout} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🚪 Sign Out</button>
-          </div>
-        </div>
-
-        <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"8px"}}>
-          Trip Planner PRO · Firebase Live Sync · Weather by wttr.in · FX by Frankfurter
-        </div>
-      </div>
-    );
-  };
-
-  // ========== MODALS ==========
-  const renderModal = ()=>{
+// ========== 7i. MODAL RENDERER ==========
+  const renderModal=()=>{
     if(!modal) return null;
-
-    if(modal.type==="expense") return(
-      <EditModal title={editForm._editId?"Edit Expense":"Add Expense"} onClose={closeModal} onSave={saveExpense} values={editForm} onChange={setField}
-        fields={[
-          {key:"date",label:"Date",type:"date"},
-          {key:"description",label:"Description",placeholder:"e.g. Hotel booking"},
-          {key:"amount",label:"Amount (₹)",inputType:"number",placeholder:"0"},
-          {key:"category",label:"Category",type:"select",options:EXPENSE_CATEGORIES},
-          {key:"paidBy",label:"Paid By",type:"select",options:memberNames.map(n=>({value:n,label:n}))},
-          {key:"splitAmong",label:"Split Among",type:"checkboxGroup",options:memberNames}
-        ]}
-      />
-    );
-
-    if(modal.type==="activity") return(
-      <EditModal title={editForm._editId?"Edit Activity":"Add Activity"} onClose={closeModal} onSave={saveActivity} values={editForm} onChange={setField}
-        fields={[
-          {key:"time",label:"Time (HH:MM)",placeholder:"09:00"},
-          {key:"title",label:"Activity Title",placeholder:"e.g. Breakfast"},
-          {key:"location",label:"Location",placeholder:"e.g. Hotel"},
-          {key:"notes",label:"Notes (optional)",placeholder:"Any details..."}
-        ]}
-      />
-    );
-
-    if(modal.type==="packing") return(
-      <EditModal title={editForm._editId?"Edit Item":"Add Packing Item"} onClose={closeModal} onSave={savePackingItem} values={editForm} onChange={setField}
-        fields={[
-          {key:"category",label:"Category",type:"select",options:PACKING_CATEGORIES},
-          {key:"item",label:"Item Name",placeholder:"e.g. Sunscreen"}
-        ]}
-      />
-    );
-
-    if(modal.type==="booking") return(
-      <EditModal title={editForm._editId?"Edit Booking":"Add Booking"} onClose={closeModal} onSave={saveBooking} values={editForm} onChange={setField}
-        fields={[
-          {key:"type",label:"Type",type:"select",options:BOOKING_TYPES},
-          {key:"title",label:"Title",placeholder:"e.g. IndiGo 6E-123 Delhi→Goa"},
-          {key:"confirmationNo",label:"Confirmation / PNR",placeholder:"e.g. ABC123"},
-          {key:"date",label:"Date",type:"date"},
-          {key:"time",label:"Time",placeholder:"e.g. 06:30"},
-          {key:"location",label:"Location / Venue",placeholder:"e.g. Terminal 1, IGI Delhi"},
-          {key:"cost",label:"Cost (₹)",inputType:"number",placeholder:"0"},
-          {key:"cancellationPolicy",label:"Cancellation Policy",placeholder:"e.g. Free till May 10"},
-          {key:"status",label:"Status",type:"select",options:BOOKING_STATUSES}
-        ]}
-      />
-    );
-
-    if(modal.type==="passport") return(
-      <EditModal title={editForm._editId?"Edit Passport":"Add Passport"} onClose={closeModal} onSave={savePassport} values={editForm} onChange={setField}
-        fields={[
-          {key:"memberName",label:"Member",type:"select",options:memberNames.map(n=>({value:n,label:n}))},
-          {key:"passportNo",label:"Passport Number",placeholder:"e.g. A1234567"},
-          {key:"nationality",label:"Nationality",placeholder:"e.g. Indian"},
-          {key:"expiry",label:"Expiry Date",type:"date"}
-        ]}
-      />
-    );
-
-    if(modal.type==="insurance") return(
-      <EditModal title="Insurance Details" onClose={closeModal} onSave={saveInsurance} values={editForm} onChange={setField}
-        fields={[
-          {key:"provider",label:"Insurance Provider",placeholder:"e.g. Bajaj Allianz Travel"},
-          {key:"policyNumber",label:"Policy Number",placeholder:"e.g. PL123456789"},
-          {key:"emergencyPhone",label:"Emergency Helpline",placeholder:"e.g. +1-800-XXX-XXXX"},
-          {key:"coverageDetails",label:"Coverage Details",type:"textarea",placeholder:"What's covered, limits, etc."}
-        ]}
-      />
-    );
-
-    if(modal.type==="emcontact") return(
-      <EditModal title={editForm._editId?"Edit Contact":"Add Emergency Contact"} onClose={closeModal} onSave={saveEmContact} values={editForm} onChange={setField}
-        fields={[
-          {key:"name",label:"Name",placeholder:"e.g. Mom"},
-          {key:"relationship",label:"Relationship",placeholder:"e.g. Mother, Friend"},
-          {key:"phone",label:"Phone Number",placeholder:"e.g. +91 98765 43210"}
-        ]}
-      />
-    );
-
-    if(modal.type==="task") return(
-      <EditModal title={editForm._editId?"Edit Task":"Add Task"} onClose={closeModal} onSave={saveTask} values={editForm} onChange={setField}
-        fields={[
-          {key:"title",label:"Task Title",placeholder:"e.g. Book restaurant for Day 3"},
-          {key:"description",label:"Description",type:"textarea",placeholder:"More details..."},
-          {key:"assignedTo",label:"Assign To",type:"select",options:memberNames.map(n=>({value:n,label:n}))},
-          {key:"dueDate",label:"Due Date",type:"date"},
-          {key:"status",label:"Status",type:"select",options:TASK_STATUSES}
-        ]}
-      />
-    );
-
-    if(modal.type==="template") return(
-      <EditModal title="Save as Template" onClose={closeModal} onSave={saveAsTemplate} values={editForm} onChange={setField}
-        fields={[{key:"templateName",label:"Template Name",placeholder:"e.g. Goa Beach Trip Template"}]}
-      />
-    );
-
-    if(modal.type==="member") return(
-      <EditModal title="Add Member" onClose={closeModal} onSave={saveMember} values={editForm} onChange={setField}
-        fields={[{key:"name",label:"Member Name",placeholder:"e.g. Rahul"}]}
-      />
-    );
-
+    if(modal.type==="expense") return <EditModal title={editForm._editId?"Edit Expense":"Add Expense"} onClose={closeModal} onSave={saveExpense} values={editForm} onChange={setField} fields={[{key:"date",label:"Date",type:"date"},{key:"description",label:"Description",placeholder:"e.g. Hotel booking"},{key:"amount",label:"Amount (₹)",inputType:"number",placeholder:"0"},{key:"category",label:"Category",type:"select",options:EXPENSE_CATEGORIES},{key:"paidBy",label:"Paid By",type:"select",options:memberNames.map(n=>({value:n,label:n}))},{key:"splitAmong",label:"Split Among",type:"checkboxGroup",options:memberNames},{key:"linkedBookingId",label:"Link to Booking (optional)",type:"select",options:[{value:"",label:"None"},...(tripData.bookings||[]).map(b=>({value:b.id,label:`${b.type}: ${b.title}`}))]}]}/>;
+    if(modal.type==="activity") return <EditModal title={editForm._editId?"Edit Activity":"Add Activity"} onClose={closeModal} onSave={saveActivity} values={editForm} onChange={setField} fields={[{key:"time",label:"Time (HH:MM)",placeholder:"09:00"},{key:"title",label:"Activity Title",placeholder:"e.g. Breakfast"},{key:"location",label:"Location",placeholder:"e.g. Hotel"},{key:"notes",label:"Notes (optional)",placeholder:"Details…"}]}/>;
+    if(modal.type==="packing") return <EditModal title={editForm._editId?"Edit Item":"Add Packing Item"} onClose={closeModal} onSave={savePackingItem} values={editForm} onChange={setField} fields={[{key:"category",label:"Category",type:"select",options:PACKING_CATEGORIES},{key:"item",label:"Item Name",placeholder:"e.g. Sunscreen"}]}/>;
+    if(modal.type==="booking") return <EditModal title={editForm._editId?"Edit Booking":"Add Booking"} onClose={closeModal} onSave={saveBooking} values={editForm} onChange={setField} fields={[{key:"type",label:"Type",type:"select",options:BOOKING_TYPES},{key:"title",label:"Title",placeholder:"e.g. IndiGo 6E-123"},{key:"confirmationNo",label:"Confirmation / PNR",placeholder:"e.g. ABC123"},{key:"date",label:"Date",type:"date"},{key:"time",label:"Time",placeholder:"e.g. 06:30"},{key:"location",label:"Location",placeholder:"e.g. Terminal 1"},{key:"cost",label:"Cost (₹)",inputType:"number",placeholder:"0"},{key:"cancellationPolicy",label:"Cancellation Policy",placeholder:"e.g. Free till May 10"},{key:"status",label:"Status",type:"select",options:BOOKING_STATUSES},{key:"linkedDayId",label:"Link to Itinerary Day (optional)",type:"select",options:[{value:"",label:"None"},...DAYS.map(d=>({value:String(d.id),label:`${d.label} (${d.date})`}))]}]}/>;
+    if(modal.type==="task") return <EditModal title={editForm._editId?"Edit Task":"Add Task"} onClose={closeModal} onSave={saveTask} values={editForm} onChange={setField} fields={[{key:"title",label:"Task Title",placeholder:"e.g. Book restaurant"},{key:"description",label:"Description",type:"textarea",placeholder:"More details…"},{key:"assignedTo",label:"Assign To",type:"select",options:memberNames.map(n=>({value:n,label:n}))},{key:"dueDate",label:"Due Date",type:"date"},{key:"status",label:"Status",type:"select",options:TASK_STATUSES},{key:"linkedItemType",label:"Link Type (optional)",type:"select",options:[{value:"",label:"None"},{value:"booking",label:"Booking"}]},{key:"linkedItemId",label:"Link to Booking",type:"select",options:[{value:"",label:"Select…"},...(tripData.bookings||[]).map(b=>({value:b.id,label:`${b.type}: ${b.title}`}))]}]}/>;
+    if(modal.type==="passport") return <EditModal title={editForm._editId?"Edit Passport":"Add Passport"} onClose={closeModal} onSave={savePassport} values={editForm} onChange={setField} fields={[{key:"memberName",label:"Member",type:"select",options:memberNames.map(n=>({value:n,label:n}))},{key:"passportNo",label:"Passport Number",placeholder:"e.g. A1234567"},{key:"nationality",label:"Nationality",placeholder:"e.g. Indian"},{key:"expiry",label:"Expiry Date",type:"date"}]}/>;
+    if(modal.type==="insurance") return <EditModal title="Insurance Details" onClose={closeModal} onSave={saveInsurance} values={editForm} onChange={setField} fields={[{key:"provider",label:"Provider",placeholder:"e.g. Bajaj Allianz"},{key:"policyNumber",label:"Policy Number",placeholder:"e.g. PL123456"},{key:"emergencyPhone",label:"Emergency Helpline",placeholder:"e.g. +1-800-XXX"},{key:"coverageDetails",label:"Coverage Details",type:"textarea",placeholder:"What's covered…"}]}/>;
+    if(modal.type==="emcontact") return <EditModal title={editForm._editId?"Edit Contact":"Add Emergency Contact"} onClose={closeModal} onSave={saveEmContact} values={editForm} onChange={setField} fields={[{key:"name",label:"Name",placeholder:"e.g. Mom"},{key:"relationship",label:"Relationship",placeholder:"e.g. Mother"},{key:"phone",label:"Phone",placeholder:"e.g. +91 98765 43210"}]}/>;
+    if(modal.type==="member") return <EditModal title="Add Member" onClose={closeModal} onSave={saveMember} values={editForm} onChange={setField} fields={[{key:"name",label:"Member Name",placeholder:"e.g. Rahul"}]}/>;
+    if(modal.type==="template") return <EditModal title="Save as Template" onClose={closeModal} onSave={saveTemplate} values={editForm} onChange={setField} fields={[{key:"templateName",label:"Template Name",placeholder:"e.g. Goa Beach Trip"}]}/>;
+    if(modal.type==="note") return <EditModal title={editForm._editId?"Edit Note":"Add Note"} onClose={closeModal} onSave={saveNote} values={editForm} onChange={setField} fields={[{key:"title",label:"Title",placeholder:"e.g. Must-visit places"},{key:"category",label:"Category",type:"select",options:NOTE_CATEGORIES},{key:"content",label:"Content",type:"textarea",placeholder:"Write your note here…"}]}/>;
+    if(modal.type==="quicklink") return <EditModal title={editForm._editId?"Edit Link":"Add Quick Link"} onClose={closeModal} onSave={saveQuickLink} values={editForm} onChange={setField} fields={[{key:"icon",label:"Icon (emoji)",placeholder:"🔗"},{key:"title",label:"Title",placeholder:"e.g. Google Maps"},{key:"url",label:"URL",placeholder:"e.g. maps.google.com"},{key:"description",label:"Description (optional)",placeholder:"What this link is for"}]}/>;
+    if(modal.type==="checkin") return <EditModal title={editForm._editId?"Edit Check-in":"Add Check-in Item"} onClose={closeModal} onSave={saveCheckin} values={editForm} onChange={setField} fields={[{key:"item",label:"Item / Task",placeholder:"e.g. Check hotel check-out"},{key:"assignedTo",label:"Assigned To",type:"select",options:[{value:"Everyone",label:"Everyone"},...memberNames.map(n=>({value:n,label:n}))]},{key:"date",label:"Date (optional)",type:"date"}]}/>;
     if(modal.type==="poll") return(
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,padding:"16px"}} onClick={closeModal}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:"16px"}} onClick={closeModal}>
         <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
           <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <h3 style={{fontWeight:"bold"}}>Create Poll</h3>
             <button onClick={closeModal} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
           </div>
           <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}>
-            <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Question</label>
-              <input type="text" placeholder="e.g. Where should we have dinner?" value={editForm.question||""} onChange={e=>setField("question",e.target.value)} style={{width:"100%"}} />
-            </div>
+            <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Question</label><input placeholder="e.g. Where for dinner?" value={editForm.question||""} onChange={e=>setField("question",e.target.value)} style={{width:"100%"}}/></div>
             <label style={{color:"#cbd5e1",fontSize:"13px"}}>Options</label>
             {(editForm.options||[]).map((opt,idx)=>(
               <div key={idx} style={{display:"flex",gap:"8px"}}>
-                <input type="text" placeholder={`Option ${idx+1}`} value={opt} onChange={e=>{ const opts=[...(editForm.options||[])]; opts[idx]=e.target.value; setField("options",opts); }} style={{flex:1}} />
+                <input placeholder={`Option ${idx+1}`} value={opt} onChange={e=>{const o=[...(editForm.options||[])];o[idx]=e.target.value;setField("options",o);}} style={{flex:1}}/>
                 {idx>=2&&<button onClick={()=>setField("options",(editForm.options||[]).filter((_,i)=>i!==idx))} style={{background:"#ef4444",border:"none",borderRadius:"6px",color:"white",padding:"0 10px"}}>×</button>}
               </div>
             ))}
@@ -1666,67 +1351,100 @@ React.useEffect(() => {
         </div>
       </div>
     );
-
     return null;
   };
 
   // ========== TABS ==========
-  const tabs=[
-    {id:"dashboard", label:"🏠 Home",      render:renderDashboard},
-    {id:"itinerary", label:"📅 Itinerary", render:renderItinerary},
-    {id:"bookings",  label:"📋 Bookings",  render:renderBookings},
-    {id:"packing",   label:"🎒 Packing",   render:renderPacking},
-    {id:"expenses",  label:"💰 Expenses",  render:renderExpenses},
-    {id:"tasks",     label:"✅ Tasks",     render:renderTasks},
-    {id:"documents", label:"🛂 Documents", render:renderDocuments},
-    {id:"polls",     label:"📊 Polls",     render:renderPolls},
-    {id:"members",   label:"👥 Members",   render:renderMembers},
-    {id:"settings",  label:"⚙️ Settings",  render:renderSettings}
+  const TABS=[
+    {id:"dashboard",label:"🏠 Home",       render:renderDashboard},
+    {id:"itinerary",label:"📅 Itinerary",  render:renderItinerary},
+    {id:"bookings", label:"📋 Bookings",   render:renderBookings},
+    {id:"packing",  label:"🎒 Packing",    render:renderPacking},
+    {id:"expenses", label:"💰 Expenses",   render:renderExpenses},
+    {id:"tasks",    label:"✅ Tasks",      render:renderTasks},
+    {id:"documents",label:"🛂 Docs",       render:renderDocuments},
+    {id:"polls",    label:"📊 Polls",      render:renderPolls},
+    {id:"notes",    label:"📝 Notes",      render:renderNotes},
+    {id:"links",    label:"🔗 Links",      render:renderQuickLinks},
+    {id:"checkins", label:"☑️ Check-ins",  render:renderCheckins},
+    {id:"members",  label:"👥 Members",    render:renderMembers},
+    {id:"settings", label:"⚙️ Settings",   render:renderSettings}
   ];
 
   // ========== LAYOUT ==========
   return(
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}} onClick={()=>showReminders&&setShowReminders(false)}>
-      {/* Header */}
-      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"10px 16px"}}>
-        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:"8px",maxWidth:"1200px",margin:"0 auto"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-            <div style={{fontSize:"26px"}}>✈️</div>
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}}>
+
+      {/* ── Sticky Header ── */}
+      <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.97)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"10px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"8px",maxWidth:"1200px",margin:"0 auto"}}>
+          {/* Brand */}
+          <div style={{display:"flex",alignItems:"center",gap:"8px",flexShrink:0}}>
+            <span style={{fontSize:"22px"}}>✈️</span>
             <div>
-              <h1 style={{fontWeight:"bold",fontSize:"17px",color:"white",lineHeight:"1.2"}}>Trip Planner PRO</h1>
-              <div style={{fontSize:"11px",color:"#94a3b8"}}>{authUser.username}{isAdmin?" (Admin)":""} · {isSyncing?"⏳ Syncing":"✅ Synced"}</div>
+              <h1 style={{fontWeight:"bold",fontSize:"15px",color:"white",lineHeight:"1.2"}}>Trip Planner PRO</h1>
+              <div style={{fontSize:"10px",color:"#94a3b8"}}>{authUser.username}{isAdmin?" (Admin)":""} · {isSyncing?"⏳":"✅"}</div>
             </div>
           </div>
+          {/* Search + Bell */}
           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-            {/* Reminders Bell */}
+            {/* ── Universal Search Bar ── */}
+            <div className="search-wrap" onClick={e=>e.stopPropagation()}>
+              <div style={{display:"flex",alignItems:"center",background:"#1e293b",border:`1px solid ${showSearch||searchQuery?"#3b82f6":"#334155"}`,borderRadius:"8px",padding:"5px 10px",gap:"6px",width:showSearch||searchQuery?"200px":"34px",transition:"width 0.25s",overflow:"hidden"}}>
+                <button onClick={()=>setShowSearch(v=>!v)} style={{background:"none",border:"none",padding:0,fontSize:"14px",flexShrink:0}}>🔍</button>
+                {(showSearch||searchQuery)&&(
+                  <input autoFocus type="text" placeholder="Search everything…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
+                    style={{background:"transparent",border:"none",padding:0,color:"white",fontSize:"13px",width:"100%"}}/>
+                )}
+              </div>
+              {searchQuery.length>=2&&(
+                <div className="search-dropdown">
+                  {searchResults.length===0
+                    ? <div style={{padding:"16px",color:"#64748b",textAlign:"center",fontSize:"13px"}}>No results for "{searchQuery}"</div>
+                    : searchResults.map((r,i)=>(
+                      <div key={i} className="search-result-item" onClick={()=>handleSearchResult(r)}>
+                        <span style={{fontSize:"16px",flexShrink:0}}>{r.icon}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:"13px",fontWeight:"500",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Highlight text={r.label} query={searchQuery}/></div>
+                          <div style={{fontSize:"11px",color:"#64748b"}}>{r.type} · {r.sub}</div>
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+            {/* ── Reminders Bell ── */}
             <div className="reminder-btn-wrap" onClick={e=>{e.stopPropagation();setShowReminders(v=>!v);}}>
-              <button style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"8px",color:"white",padding:"6px 10px",fontSize:"16px"}}>🔔</button>
+              <button style={{background:"#1e293b",border:"1px solid #334155",borderRadius:"8px",color:"white",padding:"5px 10px",fontSize:"15px"}}>🔔</button>
               {reminders.length>0&&<div className="reminder-badge">{reminders.length}</div>}
-              {showReminders&&<RemindersDropdown />}
+              {showReminders&&<RemindersDropdown/>}
             </div>
           </div>
         </div>
-        {/* Tab Bar */}
-        <div style={{maxWidth:"1200px",margin:"8px auto 0",display:"flex",gap:"4px",overflowX:"auto",paddingBottom:"2px"}}>
-          {tabs.map(tab=>(
+        {/* ── Tab Bar ── */}
+        <div style={{maxWidth:"1200px",margin:"8px auto 0",display:"flex",gap:"2px",overflowX:"auto",paddingBottom:"2px"}}>
+          {TABS.map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-              style={{padding:"6px 12px",borderRadius:"8px",fontSize:"12px",whiteSpace:"nowrap",border:"none",background:activeTab===tab.id?"#3b82f6":"transparent",color:activeTab===tab.id?"white":"#94a3b8",fontWeight:activeTab===tab.id?"600":"normal"}}>
+              style={{padding:"5px 9px",borderRadius:"8px",fontSize:"11px",whiteSpace:"nowrap",border:"none",background:activeTab===tab.id?"#3b82f6":"transparent",color:activeTab===tab.id?"white":"#94a3b8",fontWeight:activeTab===tab.id?"600":"normal"}}>
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{padding:"20px 16px",maxWidth:"1200px",margin:"0 auto"}}>
-        {(()=>{ const t=tabs.find(t=>t.id===activeTab); return t?t.render():null; })()}
+      {/* ── Page Content ── */}
+      <div style={{padding:"20px 16px 90px",maxWidth:"1200px",margin:"0 auto"}}>
+        {TABS.find(t=>t.id===activeTab)?.render()}
       </div>
 
       {renderModal()}
+      <FAB/>
     </div>
   );
 };
 
+// ========== 8. REACT DOM RENDER ==========
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
 </body>
