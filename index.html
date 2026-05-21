@@ -39,6 +39,26 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:0
 /* Misc */
 textarea{resize:vertical;min-height:80px}
 mark{background:#f59e0b33;color:#f59e0b;border-radius:2px;padding:0 2px}
+/* Chat */
+.chat-bubble{max-width:72%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word}
+.chat-bubble-me{background:#3b82f6;color:white;border-bottom-right-radius:3px;align-self:flex-end}
+.chat-bubble-other{background:#1e293b;color:#eef2ff;border-bottom-left-radius:3px;border:1px solid #334155}
+.chat-bubble-system{background:rgba(100,116,139,0.15);color:#94a3b8;font-size:11px;padding:4px 10px;border-radius:20px;text-align:center;align-self:center;font-style:italic}
+.chat-wrap{display:flex;flex-direction:column;gap:10px;padding:12px}
+/* Offline banner */
+.offline-banner{background:#dc2626;color:white;text-align:center;padding:6px;font-size:12px;font-weight:600;letter-spacing:0.5px}
+/* Quick actions */
+.qa-bar{display:flex;gap:6px;overflowX:auto;padding:6px 0;maxWidth:1200px;margin:0 auto}
+.qa-btn{padding:5px 12px;background:rgba(59,130,246,0.12);border:1px solid #3b82f622;borderRadius:20px;color:#60a5fa;fontSize:12px;fontWeight:500;white-space:nowrap}
+.qa-btn:hover{background:rgba(59,130,246,0.25)}
+/* Compact mode */
+body.compact .section-card{padding:10px}
+body.compact .stat-card{padding:10px}
+/* Confirm modal */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:600;padding:16px}
+/* Auto-suggest chip */
+.suggest-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.3);color:#a78bfa;cursor:pointer;margin-top:4px}
+.suggest-chip:hover{background:rgba(167,139,250,0.3)}
 /* Dropdowns */
 .reminder-dropdown{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:#1e293b;border:1px solid #334155;border-radius:12px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
 .search-wrap{position:relative}
@@ -91,21 +111,10 @@ const VALID_USERS = [
   {username:"Manishk", password:"AIStrip@001", role:"member"},
   {username:"Atikab",  password:"AIStrip@001", role:"member"}
 ];
-const DEFAULT_START = "2026-05-17";
-const DEFAULT_END = "2026-05-26";
-const DAYS = (() => {
-  const days = [];
-  const start = new Date(DEFAULT_START);
-  const end = new Date(DEFAULT_END);
-  let current = new Date(start);
-  let dayNum = 1;
-  while (current <= end) {
-    days.push({ id: dayNum, label: `Day ${dayNum}`, date: current.toISOString().slice(0, 10) });
-    current.setDate(current.getDate() + 1);
-    dayNum++;
-  }
-  return days;
-})();
+const DAYS = Array.from({length:10},(_,i)=>{
+  const d=new Date("2026-05-17"); d.setDate(d.getDate()+i);
+  return {id:i+1, label:`Day ${i+1}`, date:d.toISOString().slice(0,10)};
+});
 const TRIP_ID            = "current_trip";
 const PACKING_CATEGORIES = ["Clothing","Toiletries","Electronics","Documents","Misc"];
 const EXPENSE_CATEGORIES = ["Food","Transport","Stay","Activities","Shopping","Misc"];
@@ -119,6 +128,17 @@ const CAT_PILL   = {Food:"pill-yellow",Transport:"pill-blue",Stay:"pill-purple",
 const NOTE_PILL  = {General:"pill-gray",Idea:"pill-blue",Reminder:"pill-yellow",Important:"pill-red",Meeting:"pill-purple"};
 const WMO_ICONS  = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌧️",61:"🌦️",63:"🌧️",65:"⛈️",71:"🌨️",73:"❄️",80:"🌦️",81:"⛈️",95:"⛈️"};
 const TYPE_ICON  = {Flight:"✈️",Hotel:"🏨",Train:"🚂",Cab:"🚕",Activity:"🎯",Other:"📌"};
+const DECISION_STATUSES = ["Proposed","Approved","Implemented","Rejected"];
+const DECISION_PILL = {Proposed:"pill-yellow",Approved:"pill-green",Implemented:"pill-blue",Rejected:"pill-red"};
+const LOCAL_INFO_DEFAULTS = {hotelName:"",hotelAddress:"",hotelPhone:"",meetingPoint:"",emergencyNotes:"",transportTips:"",localCurrency:"",timezone:""};
+const KEYWORD_CATEGORIES = [
+  {pattern:/hotel|stay|room|accommodation|resort|hostel|inn|lodge/i, cat:"Stay"},
+  {pattern:/taxi|uber|ola|flight|train|bus|fuel|metro|cab|airport|auto|rickshaw|transport|petrol|diesel/i, cat:"Transport"},
+  {pattern:/restaurant|food|dinner|lunch|breakfast|cafe|eat|meal|snack|drink|bar|chai|coffee|biryani|pizza/i, cat:"Food"},
+  {pattern:/movie|tour|entry|ticket|museum|show|concert|park|entertainment|activity|adventure|cruise|safari/i, cat:"Activities"},
+  {pattern:/mall|gift|shop|shopping|souvenir|market|buy|cloth|dress|jewel/i, cat:"Shopping"}
+];
+const SENDER_COLORS = {Sanjug:"#3b82f6",Manishk:"#10b981",Atikab:"#a78bfa"};
 
 // ========== 4. HELPER FUNCTIONS ==========
 const generateId     = ()=>`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -263,6 +283,21 @@ const App = () => {
   const [showFAB,setShowFAB]                   = React.useState(false);
   const [noteFilter,setNoteFilter]             = React.useState("all");
   const [checkinFilter,setCheckinFilter]       = React.useState("all");
+  // — v4 additions —
+  const [decisionFilter,setDecisionFilter]     = React.useState("all");
+  const [expandedCards,setExpandedCards]       = React.useState({});
+  const [dailyBudgetDay,setDailyBudgetDay]     = React.useState(null);
+  // — v5 additions —
+  const [isOffline,setIsOffline]               = React.useState(!navigator.onLine);
+  const [lastSynced,setLastSynced]             = React.useState(null);
+  const [chatMessages,setChatMessages]         = React.useState([]);
+  const [chatInput,setChatInput]               = React.useState("");
+  const [unreadChat,setUnreadChat]             = React.useState(0);
+  const [chatLastSeen,setChatLastSeen]         = React.useState(()=>parseInt(localStorage.getItem("chat_last_seen")||"0"));
+  const [viewMode,setViewMode]                 = React.useState(()=>localStorage.getItem("trip_view_mode")||"comfortable");
+  const [confirmModal,setConfirmModal]         = React.useState(null);
+  const [suggestedCat,setSuggestedCat]         = React.useState("");
+  const [debouncedQ,setDebouncedQ]             = React.useState("");
 
 // ========== 7b. DEFAULT DATA ==========
   const getDefaultTripData = () => ({
@@ -271,11 +306,15 @@ const App = () => {
       {id:"m2",name:"Manishk",isAdmin:false},
       {id:"m3",name:"Atikab",isAdmin:false}
     ],
-    itinerary: DAYS.map(day => ({
-  dayId: day.id,
-  date: day.date,
-  activities: []
-})),
+    itinerary:DAYS.map(day=>({
+      dayId:day.id, date:day.date,
+      activities:sortActivities([
+        {id:generateId(),time:"09:00",title:"Breakfast",location:"Hotel",notes:""},
+        {id:generateId(),time:"11:00",title:"Visit local market",location:"City Center",notes:""},
+        {id:generateId(),time:"15:00",title:"Lunch",location:"Local Restaurant",notes:""},
+        {id:generateId(),time:"18:00",title:"Sunset point",location:"Viewpoint",notes:""}
+      ])
+    })),
     packingList:[
       {id:generateId(),category:"Clothing",item:"T-shirts (3)",checked:false},
       {id:generateId(),category:"Clothing",item:"Jeans/Shorts",checked:false},
@@ -287,7 +326,11 @@ const App = () => {
       {id:generateId(),category:"Documents",item:"ID proof",checked:false},
       {id:generateId(),category:"Misc",item:"First aid kit",checked:false}
     ],
-expenses:[],
+    expenses:[
+      {id:generateId(),date:DAYS[0].date,description:"Hotel booking",amount:15000,paidBy:"Sanjug",splitAmong:["Sanjug","Manishk","Atikab"],category:"Stay",linkedBookingId:""},
+      {id:generateId(),date:DAYS[0].date,description:"Dinner",amount:2400,paidBy:"Manishk",splitAmong:["Sanjug","Manishk","Atikab"],category:"Food",linkedBookingId:""},
+      {id:generateId(),date:DAYS[1].date,description:"Taxi fare",amount:1200,paidBy:"Atikab",splitAmong:["Sanjug","Manishk","Atikab"],category:"Transport",linkedBookingId:""}
+    ],
     polls:[{id:generateId(),question:"Where should we have dinner on Day 2?",options:["Indian restaurant","Italian place","Street food"],votes:{"Indian restaurant":2,"Italian place":1,"Street food":0},createdBy:"Sanjug"}],
     bookings:[],
     documents:{passports:[],insurance:{},emergencyContacts:[],medicalNotes:""},
@@ -298,7 +341,11 @@ expenses:[],
     savedTemplates:[],
     tripNotes:[],
     quickLinks:[],
-    checkins:[]
+    checkins:[],
+    localInfo:{hotelName:"",hotelAddress:"",hotelPhone:"",meetingPoint:"",emergencyNotes:"",transportTips:"",localCurrency:"",timezone:""},
+    decisions:[],
+    dailyBudgets:{},
+    tripMemories:[]
   });
 
 // ========== 7c. USE EFFECTS ==========
@@ -314,8 +361,30 @@ expenses:[],
     const ref=db.collection("trips").doc(TRIP_ID);
     let unsub=null;
     const init=async()=>{
-      try{const d=await ref.get();if(!d.exists)await ref.set(getDefaultTripData());}catch(e){console.error(e);}
-      finally{unsub=ref.onSnapshot(snap=>{if(snap.exists)setTripData(snap.data());setLoading(false);},e=>{console.error(e);setLoading(false);});}
+      // Load from cache if offline
+      if(!navigator.onLine){
+        const cached=localStorage.getItem("trip_data_cache");
+        if(cached){try{setTripData(JSON.parse(cached));}catch(e){}}
+        setLoading(false); return;
+      }
+      try{const d=await ref.get();if(!d.exists)await ref.set(getDefaultTripData());}catch(e){
+        // Fallback to cache on error
+        const cached=localStorage.getItem("trip_data_cache");
+        if(cached){try{setTripData(JSON.parse(cached));}catch(e2){}}
+        setLoading(false); return;
+      }
+      finally{
+        unsub=ref.onSnapshot(snap=>{
+          if(snap.exists){
+            const data=snap.data();
+            setTripData(data);
+            setLastSynced(new Date());
+            // Cache to localStorage
+            try{localStorage.setItem("trip_data_cache",JSON.stringify(data));}catch(e){}
+          }
+          setLoading(false);
+        },e=>{console.error(e);setLoading(false);});
+      }
     };
     init();
     return()=>unsub&&unsub();
@@ -346,6 +415,52 @@ expenses:[],
     return()=>document.removeEventListener("click",h);
   },[]);
 
+  // Online / offline detection
+  React.useEffect(()=>{
+    const goOnline=()=>setIsOffline(false);
+    const goOffline=()=>setIsOffline(true);
+    window.addEventListener("online",goOnline);
+    window.addEventListener("offline",goOffline);
+    return()=>{window.removeEventListener("online",goOnline);window.removeEventListener("offline",goOffline);};
+  },[]);
+
+  // Chat Firestore listener
+  React.useEffect(()=>{
+    if(!authUser) return;
+    const chatRef=db.collection("tripchats").doc(TRIP_ID).collection("messages").orderBy("tsMs","desc").limit(60);
+    const unsub=chatRef.onSnapshot(snap=>{
+      const msgs=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
+      setChatMessages(msgs);
+      const seen=parseInt(localStorage.getItem("chat_last_seen")||"0");
+      const unread=msgs.filter(m=>m.tsMs>seen&&m.sender!==authUser.username&&m.type!=="system").length;
+      setUnreadChat(unread);
+    },()=>{});
+    return()=>unsub();
+  },[authUser]);
+
+  // Debounce search query
+  React.useEffect(()=>{
+    const t=setTimeout(()=>setDebouncedQ(searchQuery),280);
+    return()=>clearTimeout(t);
+  },[searchQuery]);
+
+  // Remember last active tab
+  React.useEffect(()=>{
+    if(activeTab) localStorage.setItem("trip_last_tab",activeTab);
+  },[activeTab]);
+
+  // Restore last tab on mount
+  React.useEffect(()=>{
+    const last=localStorage.getItem("trip_last_tab");
+    if(last) setActiveTab(last);
+  },[]);
+
+  // Apply compact/comfortable mode
+  React.useEffect(()=>{
+    document.body.classList.toggle("compact",viewMode==="compact");
+    localStorage.setItem("trip_view_mode",viewMode);
+  },[viewMode]);
+
 // ========== COMPUTED ==========
   const isAdmin      = authUser?.role==="admin";
   const memberNames  = (tripData?.members||[]).map(m=>m.name);
@@ -367,83 +482,26 @@ expenses:[],
     finally{setIsSyncing(false);}
   };
   const handleLogout = ()=>{localStorage.removeItem("trip_auth");setAuthUser(null);setTripData(null);setLoading(false);};
+
   const SyncBanner = ()=>isSyncing?<div style={{textAlign:"center",fontSize:"12px",color:"#3b82f6",padding:"4px",background:"rgba(59,130,246,0.1)",borderRadius:"6px",marginBottom:"8px"}}>⏳ Syncing…</div>:null;
 
-  // ========== MOVED: All hooks and helpers BEFORE conditional returns ==========
+  // Loading / auth gates
+  if(loading) return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div></div>;
+  if(!authUser) return <LoginPage onLogin={u=>{setAuthUser(u);setLoading(true);}}/>;
+  if(!tripData)  return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div><div style={{color:"#94a3b8",fontSize:"14px"}}>Loading trip data…</div></div>;
+
   const openModal = (type,init={})=>{setEditForm(init);setModal({type});};
   const closeModal = ()=>{setModal(null);setEditForm({});};
   const setField = (k,v)=>setEditForm(p=>({...p,[k]:v}));
-
-  // Search results useMemo
-  const searchResults = React.useMemo(()=>{
-    const q=(searchQuery||"").trim();
-    if(q.length<2) return [];
-    const ql=q.toLowerCase();
-    const match=t=>String(t||"").toLowerCase().includes(ql);
-    const res=[];
-    (tripData?.bookings||[]).forEach(b=>{if(match(b.title))res.push({type:"Booking",icon:"📋",label:b.title,sub:b.date,tab:"bookings",dayId:null});});
-    (tripData?.tasks||[]).forEach(t=>{if(match(t.title)||match(t.description))res.push({type:"Task",icon:"✅",label:t.title,sub:t.assignedTo,tab:"tasks",dayId:null});});
-    (tripData?.expenses||[]).forEach(e=>{if(match(e.description))res.push({type:"Expense",icon:"💰",label:e.description,sub:`₹${fmt(e.amount)}`,tab:"expenses",dayId:null});});
-    (tripData?.members||[]).forEach(m=>{if(match(m.name))res.push({type:"Member",icon:"👤",label:m.name,sub:m.isAdmin?"Admin":"Member",tab:"members",dayId:null});});
-    (tripData?.itinerary||[]).forEach(d=>(d.activities||[]).forEach(a=>{if(match(a.title))res.push({type:"Activity",icon:"📅",label:a.title,sub:DAYS.find(dy=>dy.id===d.dayId)?.label||"",tab:"itinerary",dayId:d.dayId});}));
-    (tripData?.tripNotes||[]).forEach(n=>{if(match(n.title)||match(n.content))res.push({type:"Note",icon:"📝",label:n.title,sub:n.category,tab:"notes",dayId:null});});
-    (tripData?.packingList||[]).forEach(p=>{if(match(p.item))res.push({type:"Packing",icon:"🎒",label:p.item,sub:p.category,tab:"packing",dayId:null});});
-    (tripData?.checkins||[]).forEach(c=>{if(match(c.item))res.push({type:"Check-in",icon:"☑️",label:c.item,sub:c.assignedTo,tab:"checkins",dayId:null});});
-    (tripData?.quickLinks||[]).forEach(l=>{if(match(l.title)||match(l.description))res.push({type:"Link",icon:"🔗",label:l.title,sub:l.url,tab:"links",dayId:null});});
-    return res.slice(0,12);
-  },[searchQuery,tripData]);
-
-  const handleSearchResult = r=>{
-    setActiveTab(r.tab);
-    if(r.tab==="itinerary"&&r.dayId) setActiveDay(r.dayId);
-    setSearchQuery(""); setShowSearch(false);
-  };
-
-  const handleFAB = type=>{
-    setShowFAB(false);
-    const td=today();
-    const map={
-      expense:{date:td,description:"",amount:"",paidBy:memberNames[0]||"",splitAmong:[...memberNames],category:"Misc",linkedBookingId:""},
-      booking:{type:"Hotel",title:"",confirmationNo:"",date:DAYS[0]?.date||DEFAULT_START,time:"",location:"",cost:"",cancellationPolicy:"",status:"confirmed",linkedDayId:""},
-      task:{title:"",description:"",assignedTo:memberNames[0]||"",dueDate:"",status:"pending",linkedItemType:"",linkedItemId:""},
-      poll:{question:"",options:["",""]},
-      activity:{_dayId:activeDay,time:"09:00",title:"",location:"",notes:""},
-      member:{name:""},
-      note:{title:"",content:"",category:"General"},
-      checkin:{item:"",assignedTo:"Everyone",date:td}
-    };
-    openModal(type,map[type]||{});
-  };
-
-  const getBookingById = id=>(tripData?.bookings||[]).find(b=>b.id===id);
-  const getDayById = id=>DAYS.find(d=>d.id===parseInt(id));
-
-  const getReminders = ()=>{
-    const list=[];
-    const td=today();
-    const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
-    (tripData?.bookings||[]).forEach(b=>{if(b.date>=td&&b.date<=tomorrow&&b.status!=="cancelled")list.push({icon:"📅",msg:`Booking: ${b.title} on ${b.date}`});});
-    (tripData?.tasks||[]).filter(t=>t.dueDate===td&&t.status!=="done").forEach(t=>list.push({icon:"⏰",msg:`Task due today: ${t.title}`}));
-    if(expSummary.settlements?.length>0){
-      const old2=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
-      if((tripData?.expenses||[]).some(e=>e.date<=old2))list.push({icon:"💰",msg:`${expSummary.settlements.length} pending settlement(s)`});
-    }
-    (tripData?.polls||[]).forEach(p=>{const tv=Object.values(p.votes||{}).reduce((a,b)=>a+b,0);if(tv===0)list.push({icon:"📊",msg:`Poll needs votes: "${(p.question||"").slice(0,30)}…"`});});
-    return list;
-  };
-  const reminders = getReminders();
-
-  // Loading / auth gates - MUST BE AFTER ALL HOOKS
-  if(loading) return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div></div>;
-  if(!authUser) return <LoginPage onLogin={u=>{setAuthUser(u);setLoading(true);}}/>;
-  if(!tripData) return <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"12px"}}><div className="loading-spinner" style={{width:"40px",height:"40px"}}></div><div style={{color:"#94a3b8",fontSize:"14px"}}>Loading trip data…</div></div>;
 
 // ========== 7d. CORE HANDLERS (Existing) ==========
   const saveExpense=()=>{
     const {_editId,date,description,amount,paidBy,splitAmong,category,linkedBookingId}=editForm;
     if(!description||!amount||!paidBy||!splitAmong?.length){alert("Fill all required fields.");return;}
+    if(parseFloat(amount)<0){alert("Amount cannot be negative.");return;}
     const rec={id:_editId||generateId(),date:date||DAYS[0].date,description,amount:parseFloat(amount),paidBy,splitAmong,category:category||"Misc",linkedBookingId:linkedBookingId||""};
     updateTripData({...tripData,expenses:_editId?(tripData.expenses||[]).map(e=>e.id===_editId?rec:e):[...(tripData.expenses||[]),rec]});
+    if(!_editId) sendChat(`${authUser.username} added expense: ${description} — ${fmtAmt(parseFloat(amount))}`, "system");
     closeModal();
   };
   const deleteExpense=id=>updateTripData({...tripData,expenses:(tripData.expenses||[]).filter(e=>e.id!==id)});
@@ -493,7 +551,9 @@ expenses:[],
     const rec={id:_editId||generateId(),type:type||"Hotel",title,confirmationNo:confirmationNo||"",date,time:time||"",location:location||"",cost:parseFloat(cost)||0,cancellationPolicy:cancellationPolicy||"",status:status||"confirmed",linkedDayId:linkedDayId||""};
     const list=[...(_editId?(tripData.bookings||[]).map(b=>b.id===_editId?rec:b):[...(tripData.bookings||[]),rec])];
     list.sort((a,b)=>a.date.localeCompare(b.date));
-    updateTripData({...tripData,bookings:list}); closeModal();
+    updateTripData({...tripData,bookings:list});
+    if(!_editId) sendChat(`${authUser.username} added booking: ${title} (${type})`, "system");
+    closeModal();
   };
   const deleteBooking=id=>updateTripData({...tripData,bookings:(tripData.bookings||[]).filter(b=>b.id!==id)});
 
@@ -502,6 +562,7 @@ expenses:[],
     if(!title){alert("Enter task title");return;}
     const rec={id:_editId||generateId(),title,description:description||"",assignedTo:assignedTo||memberNames[0]||"",dueDate:dueDate||"",status:status||"pending",createdBy:authUser.username,linkedItemType:linkedItemType||"",linkedItemId:linkedItemId||""};
     updateTripData({...tripData,tasks:_editId?(tripData.tasks||[]).map(t=>t.id===_editId?rec:t):[...(tripData.tasks||[]),rec]});
+    if(!_editId) sendChat(`${authUser.username} added task: ${title} → ${rec.assignedTo}`, "system");
     closeModal();
   };
   const deleteTask=id=>updateTripData({...tripData,tasks:(tripData.tasks||[]).filter(t=>t.id!==id)});
@@ -540,14 +601,11 @@ expenses:[],
   const loadTemplate=id=>{const t=(tripData.savedTemplates||[]).find(x=>x.id===id);if(!t)return;if(window.confirm(`Load "${t.name}"?`))updateTripData({...tripData,packingList:t.packingList,budgetTargets:t.budgetTargets});};
   const deleteTemplate=id=>updateTripData({...tripData,savedTemplates:(tripData.savedTemplates||[]).filter(t=>t.id!==id)});
 
-  const exportPDF = type=>{
+  const exportPDF=type=>{
     let html="";
     const s="font-family:Arial,sans-serif;padding:24px;color:#111;";
-    if(type==="itinerary") {
-      const tripDays = (tripData?.tripStartDate && tripData?.tripEndDate) ? 
-        (() => { const days=[]; let cur=new Date(tripData.tripStartDate); const end=new Date(tripData.tripEndDate); let num=1; while(cur<=end){ days.push({id:num, label:`Day ${num}`, date:cur.toISOString().slice(0,10)}); cur.setDate(cur.getDate()+1); num++; } return days; })() : DAYS;
-      html=`<div style="${s}"><h1>✈️ Trip Itinerary</h1>${tripDays.map(day=>{const dd=(tripData.itinerary||[]).find(d=>d.dayId===day.id);const acts=sortActivities(dd?.activities||[]);return`<div style="margin-bottom:20px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${day.label} · ${day.date}</h2>${acts.map(a=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px"><b>${a.time}</b> — ${a.title}${a.location?` @ ${a.location}`:""}${a.notes?`<br><em style="color:#555">${a.notes}</em>`:""}</div>`).join("")}</div>`;}).join("")}</div>`;
-    } else if(type==="packing") html=`<div style="${s}"><h1>🎒 Packing Checklist</h1>${PACKING_CATEGORIES.map(cat=>{const items=(tripData.packingList||[]).filter(i=>i.category===cat);return items.length?`<div style="margin-bottom:16px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${cat}</h2>${items.map(i=>`<div style="margin:4px 0">${i.checked?"☑":"☐"} ${i.item}</div>`).join("")}</div>`:"";}).join("")}</div>`;
+    if(type==="itinerary") html=`<div style="${s}"><h1>✈️ Trip Itinerary</h1>${DAYS.map(day=>{const dd=(tripData.itinerary||[]).find(d=>d.dayId===day.id);const acts=sortActivities(dd?.activities||[]);return`<div style="margin-bottom:20px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${day.label} · ${day.date}</h2>${acts.map(a=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px"><b>${a.time}</b> — ${a.title}${a.location?` @ ${a.location}`:""}${a.notes?`<br><em style="color:#555">${a.notes}</em>`:""}</div>`).join("")}</div>`;}).join("")}</div>`;
+    else if(type==="packing") html=`<div style="${s}"><h1>🎒 Packing Checklist</h1>${PACKING_CATEGORIES.map(cat=>{const items=(tripData.packingList||[]).filter(i=>i.category===cat);return items.length?`<div style="margin-bottom:16px"><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">${cat}</h2>${items.map(i=>`<div style="margin:4px 0">${i.checked?"☑":"☐"} ${i.item}</div>`).join("")}</div>`:"";}).join("")}</div>`;
     else html=`<div style="${s}"><h1>💰 Expense Report</h1><p>Total: ₹${fmt(expSummary.totalSpent)} · Avg/Person: ₹${fmt(expSummary.avgPerPerson)}</p><h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">Expenses</h2>${(tripData.expenses||[]).map(e=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px;border-left:3px solid #3b82f6"><b>${e.description}</b> — ₹${fmt(e.amount)}<br><small>${e.date} · ${e.category||"Misc"} · Paid by ${e.paidBy}</small></div>`).join("")}<h2 style="border-bottom:2px solid #eee;padding-bottom:4px;margin:16px 0 8px">Settlement</h2>${expSummary.settlements.map(s=>`<div style="margin:6px 0;padding:8px;background:#fff3cd;border-radius:4px"><b>${s.from}</b> → ₹${fmt(s.amount)} → <b>${s.to}</b></div>`).join("")}</div>`;
     const el=document.createElement("div");el.innerHTML=html;el.style.cssText="position:fixed;left:-9999px;top:0;";
     document.body.appendChild(el);
@@ -555,7 +613,134 @@ expenses:[],
   };
   const resetToDefault=()=>{if(window.confirm("Reset ALL trip data to defaults?"))updateTripData(getDefaultTripData());};
 
+// ========== 7d-2. NEW HANDLERS (LocalInfo / Decisions / DailyBudget / Closure) ==========
+  const saveLocalInfo=()=>{
+    const {hotelName,hotelAddress,hotelPhone,meetingPoint,emergencyNotes,transportTips,localCurrency,timezone}=editForm;
+    updateTripData({...tripData,localInfo:{hotelName:hotelName||"",hotelAddress:hotelAddress||"",hotelPhone:hotelPhone||"",meetingPoint:meetingPoint||"",emergencyNotes:emergencyNotes||"",transportTips:transportTips||"",localCurrency:localCurrency||"",timezone:timezone||""}});
+    closeModal();
+  };
+
+  const saveDecision=()=>{
+    const {_editId,title,decision,date,madeBy,notes,status}=editForm;
+    if(!title?.trim()||!decision?.trim()){alert("Enter title and decision text");return;}
+    const rec={id:_editId||generateId(),title:title.trim(),decision:decision.trim(),date:date||today(),madeBy:madeBy||authUser.username,notes:notes||"",status:status||"Proposed"};
+    const decisions=_editId?(tripData.decisions||[]).map(d=>d.id===_editId?rec:d):[...(tripData.decisions||[]),rec];
+    updateTripData({...tripData,decisions}); closeModal();
+  };
+  const deleteDecision=id=>updateTripData({...tripData,decisions:(tripData.decisions||[]).filter(d=>d.id!==id)});
+
+  const saveDailyBudget=()=>{
+    const {_date,amount}=editForm;
+    if(!_date){return;}
+    const dailyBudgets={...(tripData.dailyBudgets||{}),[_date]:parseFloat(amount)||0};
+    updateTripData({...tripData,dailyBudgets}); closeModal();
+  };
+
+  const generateClosureReport=()=>{
+    const pl=tripData.packingList||[], tasks=tripData.tasks||[], ci=tripData.checkins||[];
+    const packedCount=pl.filter(i=>i.checked).length;
+    const tasksDone=tasks.filter(t=>t.status==="done").length;
+    const ciDone=ci.filter(c=>c.checked).length;
+    const top5=(tripData.expenses||[]).slice().sort((a,b)=>b.amount-a.amount).slice(0,5);
+    const byType={};
+    (tripData.bookings||[]).forEach(b=>{byType[b.type]=(byType[b.type]||0)+1;});
+    return {totalSpent:expSummary.totalSpent,avgPerPerson:expSummary.avgPerPerson,byCat:expSummary.byCat,paidBy:expSummary.paidBy,balance:expSummary.balance,settlements:expSummary.settlements,packedCount,totalItems:pl.length,tasksDone,totalTasks:tasks.length,ciDone,totalCI:ci.length,top5,byType,decisions:tripData.decisions||[],notes:tripData.tripNotes||[],members:tripData.members||[],generatedAt:new Date().toISOString()};
+  };
+
+  const saveTripMemory=(report)=>{
+    const mem={id:generateId(),generatedAt:report.generatedAt,summary:`Total ₹${fmt(report.totalSpent)} · ${report.members.length} members · ${report.tasksDone}/${report.totalTasks} tasks`,...report};
+    updateTripData({...tripData,tripMemories:[...(tripData.tripMemories||[]),mem]});
+    alert("Trip memory saved! ✅");
+  };
+
+  const exportClosurePDF=(report)=>{
+    const html=`<div style="font-family:Arial,sans-serif;padding:24px;color:#111;">
+      <h1>✈️ Trip Closure Report</h1>
+      <p style="color:#666;">Generated: ${new Date(report.generatedAt).toLocaleString()}</p>
+      <hr style="margin:16px 0"/>
+      <h2>💰 Financial Summary</h2>
+      <p>Total Spent: ₹${fmt(report.totalSpent)} &nbsp; Avg/Person: ₹${fmt(report.avgPerPerson)}</p>
+      <h3>By Category</h3>
+      ${EXPENSE_CATEGORIES.map(c=>`<div>${c}: ₹${fmt(report.byCat[c]||0)}</div>`).join("")}
+      <h3>Per Member</h3>
+      ${(report.members||[]).map(m=>`<div>${m.name}: Paid ₹${fmt(report.paidBy[m.name]||0)} · Balance ${report.balance[m.name]>0.01?`+₹${fmt(report.balance[m.name])}`:report.balance[m.name]<-0.01?`-₹${fmt(Math.abs(report.balance[m.name]))}`:String("Settled")}</div>`).join("")}
+      <h3>Top 5 Expenses</h3>
+      ${(report.top5||[]).map((e,i)=>`<div>${i+1}. ${e.description} — ₹${fmt(e.amount)}</div>`).join("")}
+      <h3>Settlement Instructions</h3>
+      ${(report.settlements||[]).length===0?"<p>All settled!</p>":(report.settlements||[]).map(s=>`<div>${s.from} → ₹${fmt(s.amount)} → ${s.to}</div>`).join("")}
+      <hr style="margin:16px 0"/>
+      <h2>✅ Completion Rates</h2>
+      <p>Packing: ${report.packedCount}/${report.totalItems} (${report.totalItems>0?Math.round((report.packedCount/report.totalItems)*100):0}%)</p>
+      <p>Tasks: ${report.tasksDone}/${report.totalTasks} (${report.totalTasks>0?Math.round((report.tasksDone/report.totalTasks)*100):0}%)</p>
+      <p>Check-ins: ${report.ciDone}/${report.totalCI} (${report.totalCI>0?Math.round((report.ciDone/report.totalCI)*100):0}%)</p>
+      <h2>📋 Decisions Made</h2>
+      ${(report.decisions||[]).map(d=>`<div style="margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px"><b>${d.title}</b> [${d.status}]<br>${d.decision}</div>`).join("")||"<p>No decisions recorded.</p>"}
+      <h2>📝 Trip Notes</h2>
+      ${(report.notes||[]).slice(0,5).map(n=>`<div style="margin:6px 0"><b>${n.title}</b> (${n.category})</div>`).join("")||"<p>No notes.</p>"}
+    </div>`;
+    const el=document.createElement("div");el.innerHTML=html;el.style.cssText="position:fixed;left:-9999px;top:0;";
+    document.body.appendChild(el);
+    html2pdf().set({margin:10,filename:"trip-closure-report.pdf",jsPDF:{unit:"mm",format:"a4"}}).from(el).save().then(()=>document.body.removeChild(el));
+  };
+
 // ========== 7e. NEW HANDLERS (Notes / Quick Links / Check-ins) ==========
+// ========== 7e-v5. UTILITY FUNCTIONS (Chat / AutoCat / Backup / Share) ==========
+  // Chat
+  const chatEndRef = React.useRef(null);
+  const sendChat = async(text, type="message") => {
+    if(!text?.trim()) return;
+    try{
+      await db.collection("tripchats").doc(TRIP_ID).collection("messages").add({
+        text:text.trim(), sender:authUser.username, type,
+        ts:new Date().toISOString(), tsMs:Date.now()
+      });
+    }catch(e){console.error("Chat send error",e);}
+  };
+  const markChatRead = () => {
+    const now=Date.now();
+    localStorage.setItem("chat_last_seen",String(now));
+    setChatLastSeen(now); setUnreadChat(0);
+  };
+  // Auto-categorize
+  const suggestCategory = (desc) => {
+    for(const {pattern,cat} of KEYWORD_CATEGORIES){
+      if(pattern.test(desc)) return cat;
+    }
+    return "";
+  };
+  // JSON backup/restore
+  const backupJSON = () => {
+    const blob=new Blob([JSON.stringify({...tripData,_exportedAt:new Date().toISOString()},null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=`trip-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  };
+  const restoreJSON = () => {
+    const input=document.createElement("input"); input.type="file"; input.accept=".json";
+    input.onchange=async(e)=>{
+      const file=e.target.files[0]; if(!file) return;
+      try{
+        const text=await file.text(); const data=JSON.parse(text);
+        if(!data.members){alert("Invalid backup file.");return;}
+        if(!window.confirm("This will replace ALL trip data. Continue?")) return;
+        await updateTripData(data); alert("✅ Restore successful!");
+      }catch(err){alert("Failed to restore: "+err.message);}
+    };
+    input.click();
+  };
+  // WhatsApp share
+  const shareWhatsApp = () => {
+    const members=(tripData.members||[]).map(m=>m.name).join(", ");
+    const total=fmtAmt(expSummary.totalSpent);
+    const packed=(tripData.packingList||[]).filter(i=>i.checked).length;
+    const totalItems=(tripData.packingList||[]).length;
+    const settlements=(expSummary.settlements||[]).map(s=>`  ${s.from} → ${fmtAmt(s.amount)} → ${s.to}`).join("\n")||"  All settled ✅";
+    const text=`✈️ *Trip Planner Summary*\n👥 Members: ${members}\n💰 Total Spent: ${total}\n🎒 Packed: ${packed}/${totalItems}\n📋 Bookings: ${(tripData.bookings||[]).length}\n✅ Tasks Done: ${(tripData.tasks||[]).filter(t=>t.status==="done").length}/${(tripData.tasks||[]).length}\n\n💳 *Settlements:*\n${settlements}\n\n_Generated by Trip Planner PRO_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,"_blank");
+  };
+  // Confirm helper
+  const showConfirm = (message, onConfirm) => setConfirmModal({message, onConfirm});
+  const closeConfirm = () => setConfirmModal(null);
+
   const saveNote=()=>{
     const {_editId,title,content,category}=editForm;
     if(!title?.trim()){alert("Enter a title");return;}
@@ -586,6 +771,69 @@ expenses:[],
   };
   const deleteCheckin=id=>updateTripData({...tripData,checkins:(tripData.checkins||[]).filter(c=>c.id!==id)});
   const toggleCheckin=id=>updateTripData({...tripData,checkins:(tripData.checkins||[]).map(c=>c.id===id?{...c,checked:!c.checked}:c)});
+
+// ========== 7f. SEARCH & GLOBAL ACTION HANDLERS ==========
+  const searchResults = React.useMemo(()=>{
+    const q=(debouncedQ||"").trim();
+    if(q.length<2) return [];
+    const ql=q.toLowerCase();
+    const match=t=>String(t||"").toLowerCase().includes(ql);
+    const res=[];
+    (tripData.bookings||[]).forEach(b=>{if(match(b.title))res.push({type:"Booking",icon:"📋",label:b.title,sub:b.date,tab:"bookings",dayId:null});});
+    (tripData.tasks||[]).forEach(t=>{if(match(t.title)||match(t.description))res.push({type:"Task",icon:"✅",label:t.title,sub:t.assignedTo,tab:"tasks",dayId:null});});
+    (tripData.expenses||[]).forEach(e=>{if(match(e.description))res.push({type:"Expense",icon:"💰",label:e.description,sub:`₹${fmt(e.amount)}`,tab:"expenses",dayId:null});});
+    (tripData.members||[]).forEach(m=>{if(match(m.name))res.push({type:"Member",icon:"👤",label:m.name,sub:m.isAdmin?"Admin":"Member",tab:"members",dayId:null});});
+    (tripData.itinerary||[]).forEach(d=>(d.activities||[]).forEach(a=>{if(match(a.title))res.push({type:"Activity",icon:"📅",label:a.title,sub:DAYS.find(dy=>dy.id===d.dayId)?.label||"",tab:"itinerary",dayId:d.dayId});}));
+    (tripData.tripNotes||[]).forEach(n=>{if(match(n.title)||match(n.content))res.push({type:"Note",icon:"📝",label:n.title,sub:n.category,tab:"notes",dayId:null});});
+    (tripData.packingList||[]).forEach(p=>{if(match(p.item))res.push({type:"Packing",icon:"🎒",label:p.item,sub:p.category,tab:"packing",dayId:null});});
+    (tripData.checkins||[]).forEach(c=>{if(match(c.item))res.push({type:"Check-in",icon:"☑️",label:c.item,sub:c.assignedTo,tab:"checkins",dayId:null});});
+    (tripData.quickLinks||[]).forEach(l=>{if(match(l.title)||match(l.description))res.push({type:"Link",icon:"🔗",label:l.title,sub:l.url,tab:"links",dayId:null});});
+    (tripData.decisions||[]).forEach(d=>{if(match(d.title)||match(d.decision))res.push({type:"Decision",icon:"📋",label:d.title,sub:d.status,tab:"decisions",dayId:null});});
+    return res.slice(0,12);
+  },[searchQuery,tripData]);
+
+  const handleSearchResult=r=>{
+    setActiveTab(r.tab);
+    if(r.tab==="itinerary"&&r.dayId) setActiveDay(r.dayId);
+    setSearchQuery(""); setShowSearch(false);
+  };
+
+  const handleFAB=type=>{
+    setShowFAB(false);
+    const td=today();
+    const map={
+      expense:{date:td,description:"",amount:"",paidBy:memberNames[0]||"",splitAmong:[...memberNames],category:"Misc",linkedBookingId:""},
+      booking:{type:"Hotel",title:"",confirmationNo:"",date:DAYS[0].date,time:"",location:"",cost:"",cancellationPolicy:"",status:"confirmed",linkedDayId:""},
+      task:{title:"",description:"",assignedTo:memberNames[0]||"",dueDate:"",status:"pending",linkedItemType:"",linkedItemId:""},
+      poll:{question:"",options:["",""]},
+      activity:{_dayId:activeDay,time:"09:00",title:"",location:"",notes:""},
+      member:{name:""},
+      note:{title:"",content:"",category:"General"},
+      checkin:{item:"",assignedTo:"Everyone",date:td},
+      decision:{title:"",decision:"",date:td,madeBy:authUser.username,notes:"",status:"Proposed"}
+    };
+    if(type==="localinfo"){const li=tripData.localInfo||{};openModal("localinfo",{...LOCAL_INFO_DEFAULTS,...li});return;}
+    openModal(type,map[type]||{});
+  };
+
+// ========== 7g. CROSS-LINK HELPERS ==========
+  const getBookingById=id=>(tripData.bookings||[]).find(b=>b.id===id);
+  const getDayById=id=>DAYS.find(d=>d.id===parseInt(id));
+
+  const getReminders=()=>{
+    const list=[];
+    const td=today();
+    const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
+    (tripData.bookings||[]).forEach(b=>{if(b.date>=td&&b.date<=tomorrow&&b.status!=="cancelled")list.push({icon:"📅",msg:`Booking: ${b.title} on ${b.date}`});});
+    (tripData.tasks||[]).filter(t=>t.dueDate===td&&t.status!=="done").forEach(t=>list.push({icon:"⏰",msg:`Task due today: ${t.title}`}));
+    if(expSummary.settlements.length>0){
+      const old2=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
+      if((tripData.expenses||[]).some(e=>e.date<=old2))list.push({icon:"💰",msg:`${expSummary.settlements.length} pending settlement(s)`});
+    }
+    (tripData.polls||[]).forEach(p=>{const tv=Object.values(p.votes||{}).reduce((a,b)=>a+b,0);if(tv===0)list.push({icon:"📊",msg:`Poll needs votes: "${(p.question||"").slice(0,30)}…"`});});
+    return list;
+  };
+  const reminders=getReminders();
 
 // ========== 7h. RENDER FUNCTIONS ==========
 
@@ -690,7 +938,7 @@ expenses:[],
     <div className="fab" onClick={e=>e.stopPropagation()}>
       {showFAB&&(
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"8px"}}>
-          {[["expense","💰 Add Expense"],["booking","📋 Add Booking"],["task","✅ Add Task"],["poll","📊 Add Poll"],["activity","📅 Add Activity"],["member","👤 Add Member"],["note","📝 Add Note"],["checkin","☑️ Add Check-in"]].map(([type,label])=>(
+          {[["expense","💰 Add Expense"],["booking","📋 Add Booking"],["task","✅ Add Task"],["poll","📊 Add Poll"],["activity","📅 Add Activity"],["member","👤 Add Member"],["note","📝 Add Note"],["checkin","☑️ Add Check-in"],["decision","🗳️ Add Decision"],["localinfo","🏨 Edit Local Info"]].map(([type,label])=>(
             <div key={type} className="fab-menu-item">
               <button className="fab-item-btn" onClick={()=>handleFAB(type)}>{label}</button>
             </div>
@@ -712,6 +960,164 @@ expenses:[],
     const todayActs=((tripData.itinerary||[]).find(d=>d.date===td)?.activities||[]);
     const myTasks=(tripData.tasks||[]).filter(t=>t.assignedTo===authUser.username&&t.status!=="done");
     const upBookings=(tripData.bookings||[]).filter(b=>b.date>=td&&b.status!=="cancelled").slice(0,3);
+    const li=tripData.localInfo||{};
+    // Trip progress
+    const tripStart=new Date("2026-05-17"); tripStart.setHours(0,0,0,0);
+    const tripEnd=new Date("2026-05-26"); tripEnd.setHours(23,59,59,999);
+    const now=new Date(); now.setHours(0,0,0,0);
+    const daysPassed=Math.min(Math.max(Math.ceil((now-tripStart)/86400000),0),10);
+    const tripProgressPct=Math.round((daysPassed/10)*100);
+    // Today's budget
+    const todayBudget=parseFloat((tripData.dailyBudgets||{})[td])||0;
+    const todayActual=(tripData.expenses||[]).filter(e=>e.date===td).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const todayBudgetPct=todayBudget>0?Math.min(100,Math.round((todayActual/todayBudget)*100)):0;
+    // Pending decisions
+    const pendingDecisions=(tripData.decisions||[]).filter(d=>d.status==="Proposed");
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
+        <SyncBanner/>
+        <TodayAttentionCard/>
+
+        {/* ── Local Info Card ── */}
+        {(li.hotelName||li.hotelAddress||li.meetingPoint||li.emergencyNotes)&&(
+          <div className="section-card" style={{border:"1px solid #1e4a7a",background:"linear-gradient(135deg,#1e293b,#1e3a5f)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+              <h3 style={{fontWeight:"700",color:"#60a5fa"}}>🏨 Local Trip Info</h3>
+              {isAdmin&&<button onClick={()=>openModal("localinfo",{...LOCAL_INFO_DEFAULTS,...li})} style={{padding:"4px 10px",background:"rgba(59,130,246,0.2)",border:"1px solid #3b82f644",borderRadius:"6px",color:"#60a5fa",fontSize:"12px"}}>✏️ Edit</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"10px"}}>
+              {li.hotelName&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>🏨 Hotel: </span><strong style={{color:"white"}}>{li.hotelName}</strong></div>}
+              {li.hotelAddress&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>📍 Address: </span><a href={`https://www.google.com/maps/search/${encodeURIComponent(li.hotelAddress)}`} target="_blank" rel="noopener noreferrer" style={{color:"#60a5fa"}}>{li.hotelAddress}</a></div>}
+              {li.hotelPhone&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>📞 Phone: </span><strong style={{color:"white"}}>{li.hotelPhone}</strong></div>}
+              {li.meetingPoint&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>📌 Meeting Point: </span><strong style={{color:"white"}}>{li.meetingPoint}</strong></div>}
+              {li.localCurrency&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>💱 Local Currency: </span><strong style={{color:"white"}}>{li.localCurrency}</strong></div>}
+              {li.timezone&&<div style={{fontSize:"13px"}}><span style={{color:"#94a3b8"}}>🕐 Timezone: </span><strong style={{color:"white"}}>{li.timezone}</strong></div>}
+            </div>
+            {li.transportTips&&<div style={{marginTop:"10px",fontSize:"13px",color:"#94a3b8",padding:"8px",background:"rgba(0,0,0,0.2)",borderRadius:"6px"}}>🚕 <strong>Transport:</strong> {li.transportTips}</div>}
+            {li.emergencyNotes&&<div style={{marginTop:"8px",fontSize:"13px",color:"#fca5a5",padding:"8px",background:"rgba(239,68,68,0.1)",borderRadius:"6px"}}>🚨 <strong>Emergency:</strong> {li.emergencyNotes}</div>}
+          </div>
+        )}
+        {!li.hotelName&&isAdmin&&(
+          <div className="section-card" style={{border:"1px dashed #334155",textAlign:"center",padding:"20px"}}>
+            <div style={{color:"#64748b",marginBottom:"8px"}}>🏨 No local trip info yet</div>
+            <button onClick={()=>openModal("localinfo",{...LOCAL_INFO_DEFAULTS,...li})} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontSize:"13px"}}>+ Add Hotel & Local Info</button>
+          </div>
+        )}
+
+        <CountdownWidget/>
+
+        {/* ── Trip Progress ── */}
+        <div className="section-card">
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+            <span style={{fontWeight:"600"}}>🗓️ Trip Progress</span>
+            <span style={{color:"#3b82f6",fontWeight:"600"}}>Day {daysPassed}/10 ({tripProgressPct}%)</span>
+          </div>
+          <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${tripProgressPct}%`,background:"linear-gradient(90deg,#3b82f6,#10b981)"}}></div></div>
+          {todayBudget>0&&<div style={{marginTop:"10px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"4px"}}>
+              <span style={{color:"#94a3b8"}}>Today's Budget</span>
+              <span style={{color:todayBudgetPct>90?"#ef4444":todayBudgetPct>70?"#f59e0b":"#10b981",fontWeight:"600"}}>{fmtAmt(todayActual)} / {fmtAmt(todayBudget)} ({todayBudgetPct}%)</span>
+            </div>
+            <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${todayBudgetPct}%`,background:todayBudgetPct>90?"#ef4444":todayBudgetPct>70?"#f59e0b":"#10b981"}}></div></div>
+          </div>}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px"}}>
+          {[{l:"Members",v:(tripData.members||[]).length,c:"#3b82f6"},{l:"Total Spent",v:fmtAmt(expSummary.totalSpent),c:"#10b981"},{l:"Avg/Person",v:fmtAmt(expSummary.avgPerPerson),c:"#f59e0b"},{l:"Packed",v:`${packed}/${total} (${pct}%)`,c:"#a78bfa"}].map(c=>(
+            <div key={c.l} className="stat-card">
+              <div style={{fontSize:"18px",fontWeight:"bold",color:c.c,wordBreak:"break-word"}}>{c.v}</div>
+              <div style={{fontSize:"12px",color:"#94a3b8",marginTop:"4px"}}>{c.l}</div>
+            </div>
+          ))}
+        </div>
+        <WeatherWidget/>
+
+        {/* ── Pending Decisions ── */}
+        {pendingDecisions.length>0&&(
+          <div className="section-card" style={{border:"1px solid #f59e0b33"}}>
+            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#f59e0b"}}>🗳️ Decisions Needing Attention ({pendingDecisions.length})</h3>
+            {pendingDecisions.slice(0,3).map(d=>(
+              <div key={d.id} style={{display:"flex",alignItems:"center",gap:"8px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+                <span className="pill pill-yellow">Proposed</span>
+                <span style={{flex:1,fontSize:"13px"}}>{d.title}</span>
+                <button onClick={()=>setActiveTab("decisions")} style={{padding:"3px 10px",background:"rgba(245,158,11,0.15)",border:"1px solid #f59e0b44",borderRadius:"6px",color:"#f59e0b",fontSize:"12px"}}>View →</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="section-card">
+          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📅 Today's Agenda</h3>
+          {sortActivities(todayActs).length===0?<div style={{color:"#64748b",fontSize:"13px"}}>No activities scheduled today.</div>:sortActivities(todayActs).map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+              <span style={{color:"#3b82f6",fontSize:"12px",fontFamily:"monospace",minWidth:"48px"}}>{a.time}</span>
+              <span style={{flex:1}}>{a.title}</span>
+              {a.location&&<span style={{fontSize:"11px",color:"#94a3b8"}}>{a.location}</span>}
+            </div>
+          ))}
+        </div>
+        {upBookings.length>0&&(
+          <div className="section-card">
+            <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📋 Upcoming Bookings</h3>
+            {upBookings.map(b=>(
+              <div key={b.id} style={{display:"flex",alignItems:"center",gap:"12px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+                <span style={{fontSize:"18px"}}>{TYPE_ICON[b.type]||"📌"}</span>
+                <div style={{flex:1}}><div style={{fontWeight:"500"}}>{b.title}</div><div style={{fontSize:"11px",color:"#94a3b8"}}>{b.date}{b.time&&` · ${b.time}`}</div></div>
+                <span className={`pill ${b.status==="confirmed"?"pill-green":b.status==="pending"?"pill-yellow":"pill-red"}`}>{b.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {myTasks.length>0&&(
+          <div className="section-card" style={{border:"1px solid #3b82f644"}}>
+            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#3b82f6"}}>✅ My Pending Tasks ({myTasks.length})</h3>
+            {myTasks.slice(0,4).map(t=>(
+              <div key={t.id} style={{display:"flex",alignItems:"center",gap:"10px",borderBottom:"1px solid #334155",padding:"8px 0"}}>
+                <button onClick={()=>setTaskStatus(t.id,"done")} style={{background:"none",border:"1px solid #334155",borderRadius:"4px",color:"#64748b",padding:"2px 8px",fontSize:"11px"}}>Done</button>
+                <span style={{flex:1,fontSize:"14px"}}>{t.title}</span>
+                {t.dueDate&&<span style={{fontSize:"11px",color:"#f59e0b"}}>📅 {t.dueDate}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="section-card">
+          <h3 style={{fontWeight:"600",marginBottom:"12px"}}>💰 Balance Summary</h3>
+          {(tripData.members||[]).map(m=>{
+            const bal=expSummary.balance[m.name]||0;
+            return(
+              <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #334155"}}>
+                <span>{m.name}{m.isAdmin&&<span style={{fontSize:"10px",color:"#f59e0b",marginLeft:"6px"}}>(Admin)</span>}</span>
+                <span style={{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#94a3b8",fontWeight:"600"}}>
+                  {bal>0.01?`+${fmtAmt(bal)}`:bal<-0.01?`−${fmtAmt(Math.abs(bal))}`:"Settled ✓"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {expSummary.settlements.length>0&&(
+          <div className="section-card" style={{border:"1px solid #10b98133"}}>
+            <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#10b981"}}>✅ Settlement Suggestions</h3>
+            {expSummary.settlements.map((s,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 0",borderBottom:"1px solid #334155",fontSize:"14px",flexWrap:"wrap"}}>
+                <span style={{color:"#ef4444",fontWeight:"500"}}>{s.from}</span>
+                <span style={{color:"#64748b"}}>→ pays</span>
+                <span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(s.amount)}</span>
+                <span style={{color:"#64748b"}}>→</span>
+                <span style={{color:"#3b82f6",fontWeight:"500"}}>{s.to}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="section-card">
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+            <span style={{fontWeight:"600"}}>🎒 Packing Progress</span>
+            <span style={{color:"#a78bfa",fontWeight:"600"}}>{packed}/{total} ({pct}%)</span>
+          </div>
+          <div className="progress-bar-wrap"><div className="progress-bar-fill" style={{width:`${pct}%`,background:"linear-gradient(90deg,#3b82f6,#a78bfa)"}}></div></div>
+        </div>
+      </div>
+    );
+  };
     return(
       <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
         <SyncBanner/>
@@ -803,6 +1209,12 @@ expenses:[],
   const renderItinerary=()=>{
     const dayData=(tripData.itinerary||[]).find(d=>d.dayId===activeDay);
     const acts=sortActivities(dayData?.activities||[]);
+    const dayDate=currentDay?.date||"";
+    const plannedBudget=parseFloat((tripData.dailyBudgets||{})[dayDate])||0;
+    const actualSpent=(tripData.expenses||[]).filter(e=>e.date===dayDate).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const remaining=plannedBudget-actualSpent;
+    const budgetPct=plannedBudget>0?Math.min(100,Math.round((actualSpent/plannedBudget)*100)):0;
+    const budgetColor=budgetPct>90?"#ef4444":budgetPct>70?"#f59e0b":"#10b981";
     return(
       <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
         <SyncBanner/>
@@ -834,6 +1246,27 @@ expenses:[],
               )}
             </div>
           ))}
+        </div>
+
+        {/* ── Daily Budget Section ── */}
+        <div className="section-card" style={{border:budgetPct>90?"1px solid #ef444433":budgetPct>70?"1px solid #f59e0b33":"1px solid #334155"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:plannedBudget>0?"12px":"0"}}>
+            <h3 style={{fontWeight:"600"}}>💰 Daily Budget — {currentDay?.label}</h3>
+            {isAdmin&&<button onClick={()=>openModal("dailybudget",{_date:dayDate,amount:String(plannedBudget||Math.round((Object.values(expSummary.byCat||{}).reduce((a,b)=>a+b,0)||50000)/10))})} style={{padding:"4px 12px",background:"#475569",border:"none",borderRadius:"6px",color:"white",fontSize:"12px"}}>{plannedBudget>0?"✏️ Edit Budget":"+ Set Budget"}</button>}
+          </div>
+          {plannedBudget>0?(
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px",marginBottom:"10px",textAlign:"center"}}>
+                <div><div style={{fontSize:"11px",color:"#94a3b8"}}>Planned</div><div style={{fontWeight:"700",color:"#3b82f6"}}>{fmtAmt(plannedBudget)}</div></div>
+                <div><div style={{fontSize:"11px",color:"#94a3b8"}}>Spent</div><div style={{fontWeight:"700",color:budgetColor}}>{fmtAmt(actualSpent)}</div></div>
+                <div><div style={{fontSize:"11px",color:"#94a3b8"}}>Remaining</div><div style={{fontWeight:"700",color:remaining>=0?"#10b981":"#ef4444"}}>{remaining>=0?fmtAmt(remaining):`−${fmtAmt(Math.abs(remaining))}`}</div></div>
+              </div>
+              <div className="progress-bar-wrap">
+                <div className="progress-bar-fill" style={{width:`${budgetPct}%`,background:budgetColor}}></div>
+              </div>
+              {budgetPct>90&&<div style={{fontSize:"11px",color:"#ef4444",marginTop:"6px",textAlign:"center"}}>⚠️ Daily budget {actualSpent>plannedBudget?"exceeded!":"almost exhausted!"}</div>}
+            </div>
+          ):<div style={{fontSize:"13px",color:"#64748b"}}>No daily budget set for this day. {isAdmin?"Click '+ Set Budget' to set one.":""}</div>}
         </div>
       </div>
     );
@@ -872,6 +1305,22 @@ expenses:[],
                     {b.confirmationNo&&<div style={{fontSize:"11px",color:"#64748b",marginTop:"2px"}}>Ref: <span style={{color:"#a78bfa",fontFamily:"monospace"}}>{b.confirmationNo}</span></div>}
                     {b.cancellationPolicy&&<div style={{fontSize:"11px",color:"#f59e0b",marginTop:"2px"}}>⚠️ {b.cancellationPolicy}</div>}
                     {linkedDay&&<button className="link-chip" onClick={()=>{setActiveTab("itinerary");setActiveDay(linkedDay.id);}} style={{marginTop:"6px"}}>📅 {linkedDay.label}</button>}
+                    {/* Related items chips */}
+                    {(()=>{
+                      const relExp=(tripData.expenses||[]).filter(e=>e.linkedBookingId===b.id);
+                      const relTask=(tripData.tasks||[]).filter(t=>t.linkedItemType==="booking"&&t.linkedItemId===b.id);
+                      const expKey=`bexp-${b.id}`, taskKey=`btask-${b.id}`;
+                      return(relExp.length>0||relTask.length>0)&&(
+                        <div style={{marginTop:"8px"}}>
+                          <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"6px"}}>
+                            {relExp.length>0&&<button className="link-chip" onClick={()=>setExpandedCards(p=>({...p,[expKey]:!p[expKey]}))} style={{background:"rgba(16,185,129,0.1)",borderColor:"#10b98133",color:"#10b981"}}>💰 {relExp.length} expense{relExp.length!==1?"s":""} {expandedCards[expKey]?"▲":"▼"}</button>}
+                            {relTask.length>0&&<button className="link-chip" onClick={()=>setExpandedCards(p=>({...p,[taskKey]:!p[taskKey]}))} style={{background:"rgba(59,130,246,0.1)",borderColor:"#3b82f633",color:"#60a5fa"}}>✅ {relTask.length} task{relTask.length!==1?"s":""} {expandedCards[taskKey]?"▲":"▼"}</button>}
+                          </div>
+                          {expandedCards[expKey]&&relExp.map(e=><div key={e.id} style={{fontSize:"12px",color:"#94a3b8",padding:"4px 8px",background:"#0f172a",borderRadius:"4px",marginBottom:"3px"}}>💰 {e.description} — {fmtAmt(e.amount)}</div>)}
+                          {expandedCards[taskKey]&&relTask.map(t=><div key={t.id} style={{fontSize:"12px",color:"#94a3b8",padding:"4px 8px",background:"#0f172a",borderRadius:"4px",marginBottom:"3px"}}>✅ {t.title} <span className={`pill ${t.status==="done"?"pill-green":t.status==="in-progress"?"pill-blue":"pill-gray"}`} style={{fontSize:"10px"}}>{t.status}</span></div>)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px",marginLeft:"8px"}}>
@@ -1228,7 +1677,94 @@ expenses:[],
     );
   };
 
+  // ─── Decisions (NEW) ──────────────────────────────────────────
+  const renderDecisions=()=>{
+    const all=tripData.decisions||[];
+    const list=decisionFilter==="all"?all:all.filter(d=>d.status===decisionFilter);
+    const daysSince=date=>{if(!date)return"";const diff=Math.floor((new Date()-new Date(date))/86400000);return diff===0?"today":diff===1?"1 day ago":`${diff} days ago`;};
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+        <SyncBanner/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px"}}>
+          <div style={{display:"flex",gap:"6px",overflowX:"auto"}}>
+            {["all",...DECISION_STATUSES].map(s=>(
+              <button key={s} onClick={()=>setDecisionFilter(s)} style={{padding:"5px 12px",borderRadius:"20px",border:"none",background:decisionFilter===s?"#3b82f6":"#1e293b",color:decisionFilter===s?"white":"#94a3b8",fontSize:"12px",whiteSpace:"nowrap"}}>{s==="all"?"All Decisions":s}</button>
+            ))}
+          </div>
+          <button onClick={()=>openModal("decision",{title:"",decision:"",date:today(),madeBy:authUser.username,notes:"",status:"Proposed"})} style={{padding:"8px 16px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",fontSize:"13px",flexShrink:0}}>+ Add Decision</button>
+        </div>
+        {list.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No decisions recorded yet. Start logging group decisions!</div>}
+        {list.map(d=>(
+          <div key={d.id} className="section-card" style={{border:`1px solid ${d.status==="Approved"?"#10b98133":d.status==="Rejected"?"#ef444433":d.status==="Implemented"?"#3b82f633":"#f59e0b33"}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginBottom:"4px"}}>
+                  <span style={{fontWeight:"700",fontSize:"15px"}}>🗳️ {d.title}</span>
+                  <span className={`pill ${DECISION_PILL[d.status]||"pill-gray"}`}>{d.status}</span>
+                </div>
+                <div style={{fontSize:"11px",color:"#64748b"}}>By {d.madeBy} · {d.date} · {daysSince(d.date)}</div>
+              </div>
+              {isAdmin&&<div style={{display:"flex",gap:"6px",flexShrink:0}}>
+                <button onClick={()=>openModal("decision",{_editId:d.id,title:d.title,decision:d.decision,date:d.date,madeBy:d.madeBy,notes:d.notes||"",status:d.status})} style={{background:"#0f172a",border:"1px solid #334155",borderRadius:"6px",color:"#94a3b8",padding:"4px 8px",fontSize:"12px"}}>✏️</button>
+                <button onClick={()=>deleteDecision(d.id)} style={{background:"none",border:"none",color:"#ef4444",fontSize:"15px"}}>🗑️</button>
+              </div>}
+            </div>
+            <div style={{background:"#0f172a",padding:"10px",borderRadius:"8px",fontSize:"13px",color:"#cbd5e1",lineHeight:"1.6",marginBottom:d.notes?"8px":"0"}}>{d.decision}</div>
+            {d.notes&&<div style={{fontSize:"12px",color:"#94a3b8",padding:"8px",background:"rgba(0,0,0,0.2)",borderRadius:"6px",marginTop:"6px"}}>📎 {d.notes}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // ─── Members ───────────────────────────────────────────────────
+  const renderChat=()=>{
+    const fmtTime=ts=>{if(!ts) return "";try{const d=new Date(ts);const now=new Date();const isToday=d.toDateString()===now.toDateString();return isToday?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):d.toLocaleDateString([],{month:"short",day:"numeric"})+` ${d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`;}catch(e){return "";}};
+    const handleSend=async()=>{
+      if(!chatInput.trim()) return;
+      const t=chatInput; setChatInput("");
+      await sendChat(t);
+      setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
+    };
+    return(
+      <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",minHeight:"400px"}}>
+        <SyncBanner/>
+        {/* Messages */}
+        <div onFocus={markChatRead} style={{flex:1,overflowY:"auto",background:"#0f172a",borderRadius:"12px",border:"1px solid #334155",marginBottom:"12px"}}>
+          {chatMessages.length===0&&<div style={{textAlign:"center",padding:"40px",color:"#64748b"}}>No messages yet. Say hi! 👋</div>}
+          <div className="chat-wrap">
+            {chatMessages.map(m=>{
+              const isMe=m.sender===authUser.username;
+              const isSystem=m.type==="system";
+              const color=SENDER_COLORS[m.sender]||"#94a3b8";
+              if(isSystem) return(<div key={m.id} className="chat-bubble chat-bubble-system">{m.text}</div>);
+              return(
+                <div key={m.id} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",gap:"2px"}}>
+                  {!isMe&&<div style={{fontSize:"11px",color,fontWeight:"600",paddingLeft:"4px"}}>{m.sender}</div>}
+                  <div className={`chat-bubble ${isMe?"chat-bubble-me":"chat-bubble-other"}`}>{m.text}</div>
+                  <div style={{fontSize:"10px",color:"#475569",padding:isMe?"0 4px 0 0":"0 0 0 4px"}}>{fmtTime(m.ts)}</div>
+                </div>
+              );
+            })}
+            <div ref={chatEndRef}/>
+          </div>
+        </div>
+        {/* Input */}
+        <div style={{display:"flex",gap:"8px"}}>
+          <input
+            value={chatInput}
+            onChange={e=>setChatInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();}}}
+            placeholder="Type a message… (Enter to send)"
+            style={{flex:1,borderRadius:"8px",padding:"10px 14px",fontSize:"14px"}}
+            onFocus={markChatRead}
+          />
+          <button onClick={handleSend} style={{padding:"10px 18px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",fontSize:"14px"}}>Send</button>
+        </div>
+      </div>
+    );
+  };
+
   const renderMembers=()=>(
     <div style={{display:"flex",flexDirection:"column",gap:"16px"}}>
       <SyncBanner/>
@@ -1288,6 +1824,16 @@ expenses:[],
           <button onClick={()=>exportPDF("expenses")}  style={{padding:"10px",background:"#065f46",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>💰 Export Expense Report</button>
         </div>
       </div>
+      <div className="section-card" style={{border:"1px solid #f59e0b33"}}>
+        <h3 style={{fontWeight:"600",marginBottom:"12px",color:"#f59e0b"}}>📊 Trip Closure Report</h3>
+        <p style={{fontSize:"13px",color:"#94a3b8",marginBottom:"12px"}}>Generate a comprehensive summary of the entire trip — spending, tasks, decisions, bookings, and settlements.</p>
+        <button onClick={()=>openModal("closure",{})} style={{padding:"10px",background:"linear-gradient(135deg,#92400e,#b45309)",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",width:"100%"}}>📊 Generate Trip Closure Report</button>
+        {(tripData.tripMemories||[]).length>0&&<div style={{marginTop:"10px",fontSize:"12px",color:"#64748b"}}>{(tripData.tripMemories||[]).length} saved memory{(tripData.tripMemories||[]).length!==1?"ies":""}</div>}
+      </div>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🏨 Local Trip Info</h3>
+        <button onClick={()=>{const li=tripData.localInfo||{};openModal("localinfo",{...LOCAL_INFO_DEFAULTS,...li});}} style={{padding:"10px",background:"#1e3a5f",border:"1px solid #1e4a7a",borderRadius:"8px",color:"white",fontWeight:"500",width:"100%"}}>🏨 Edit Hotel & Local Info</button>
+      </div>
       <div className="section-card">
         <h3 style={{fontWeight:"600",marginBottom:"12px"}}>📁 Trip Templates</h3>
         {isAdmin&&<button onClick={()=>openModal("template",{templateName:""})} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",marginBottom:"12px",width:"100%"}}>💾 Save Current as Template</button>}
@@ -1303,10 +1849,27 @@ expenses:[],
         ))}
       </div>
       <div className="section-card">
-        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🗃️ Data</h3>
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🗃️ Data & Backup</h3>
         <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
-          {isAdmin&&<button onClick={resetToDefault} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🔄 Reset to Default</button>}
+          <button onClick={backupJSON} style={{padding:"10px",background:"#1e40af",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>📦 Backup Data as JSON</button>
+          <button onClick={restoreJSON} style={{padding:"10px",background:"#6d28d9",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>📥 Restore from JSON File</button>
+          <button onClick={shareWhatsApp} style={{padding:"10px",background:"#065f46",border:"none",borderRadius:"8px",color:"white",fontWeight:"500",textAlign:"left"}}>💬 Share Summary via WhatsApp</button>
+          {isAdmin&&<button onClick={()=>showConfirm("Reset ALL trip data to defaults? This cannot be undone.",()=>{updateTripData(getDefaultTripData());closeConfirm();})} style={{padding:"10px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🔄 Reset to Default</button>}
           <button onClick={handleLogout} style={{padding:"10px",background:"#475569",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>🚪 Sign Out</button>
+        </div>
+      </div>
+      <div className="section-card">
+        <h3 style={{fontWeight:"600",marginBottom:"12px"}}>🎨 User Preferences</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div style={{fontWeight:"500",fontSize:"14px"}}>View Mode</div><div style={{fontSize:"12px",color:"#64748b"}}>Compact reduces card padding</div></div>
+            <div style={{display:"flex",gap:"8px"}}>
+              {["comfortable","compact"].map(m=><button key={m} onClick={()=>setViewMode(m)} style={{padding:"5px 12px",background:viewMode===m?"#3b82f6":"#1e293b",border:`1px solid ${viewMode===m?"#3b82f6":"#334155"}`,borderRadius:"6px",color:"white",fontSize:"12px",textTransform:"capitalize"}}>{m}</button>)}
+            </div>
+          </div>
+          <div style={{fontSize:"12px",color:"#64748b",padding:"8px",background:"#0f172a",borderRadius:"6px"}}>
+            💡 Last tab is automatically remembered · Last synced: {lastSynced?`${Math.round((Date.now()-lastSynced.getTime())/60000)} min ago`:"never"}
+          </div>
         </div>
       </div>
       <div style={{textAlign:"center",fontSize:"11px",color:"#64748b",padding:"8px"}}>Trip Planner PRO · Firebase · Weather: wttr.in · FX: Frankfurter</div>
@@ -1316,7 +1879,33 @@ expenses:[],
 // ========== 7i. MODAL RENDERER ==========
   const renderModal=()=>{
     if(!modal) return null;
-    if(modal.type==="expense") return <EditModal title={editForm._editId?"Edit Expense":"Add Expense"} onClose={closeModal} onSave={saveExpense} values={editForm} onChange={setField} fields={[{key:"date",label:"Date",type:"date"},{key:"description",label:"Description",placeholder:"e.g. Hotel booking"},{key:"amount",label:"Amount (₹)",inputType:"number",placeholder:"0"},{key:"category",label:"Category",type:"select",options:EXPENSE_CATEGORIES},{key:"paidBy",label:"Paid By",type:"select",options:memberNames.map(n=>({value:n,label:n}))},{key:"splitAmong",label:"Split Among",type:"checkboxGroup",options:memberNames},{key:"linkedBookingId",label:"Link to Booking (optional)",type:"select",options:[{value:"",label:"None"},...(tripData.bookings||[]).map(b=>({value:b.id,label:`${b.type}: ${b.title}`}))]}]}/>;
+    if(modal.type==="expense"){
+      const onDescChange=(k,v)=>{setField(k,v);if(k==="description"){const s=suggestCategory(v);setSuggestedCat(s);if(s&&!editForm._editId)setField("category",s);}else setField(k,v);};
+      return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:"16px"}} onClick={closeModal}>
+          <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#1e293b",zIndex:1}}>
+              <h3 style={{fontWeight:"bold"}}>{editForm._editId?"Edit Expense":"Add Expense"}</h3>
+              <button onClick={closeModal} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
+            </div>
+            <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:"12px"}}>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Date</label><input type="date" value={editForm.date||""} onChange={e=>setField("date",e.target.value)} style={{width:"100%"}}/></div>
+              <div>
+                <label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Description</label>
+                <input placeholder="e.g. Hotel booking" value={editForm.description||""} onChange={e=>onDescChange("description",e.target.value)} style={{width:"100%"}}/>
+                {suggestedCat&&!editForm._editId&&<div style={{marginTop:"4px",fontSize:"12px",color:"#94a3b8"}}>✨ Auto-categorized as <span className="suggest-chip" onClick={()=>setField("category",suggestedCat)}>⚡ {suggestedCat}</span></div>}
+              </div>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Amount (₹)</label><input type="number" placeholder="0" min="0" value={editForm.amount||""} onChange={e=>setField("amount",e.target.value)} style={{width:"100%"}}/></div>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Category</label><select value={editForm.category||""} onChange={e=>setField("category",e.target.value)} style={{width:"100%"}}>{EXPENSE_CATEGORIES.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Paid By</label><select value={editForm.paidBy||""} onChange={e=>setField("paidBy",e.target.value)} style={{width:"100%"}}>{memberNames.map(n=><option key={n} value={n}>{n}</option>)}</select></div>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"6px"}}>Split Among</label><div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>{memberNames.map(o=><label key={o} style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}><input type="checkbox" checked={(editForm.splitAmong||[]).includes(o)} onChange={ev=>{const a=editForm.splitAmong||[];setField("splitAmong",ev.target.checked?[...a,o]:a.filter(x=>x!==o));}}/><span style={{fontSize:"14px"}}>{o}</span></label>)}</div></div>
+              <div><label style={{display:"block",color:"#cbd5e1",fontSize:"13px",marginBottom:"4px"}}>Link to Booking (optional)</label><select value={editForm.linkedBookingId||""} onChange={e=>setField("linkedBookingId",e.target.value)} style={{width:"100%"}}><option value="">None</option>{(tripData.bookings||[]).map(b=><option key={b.id} value={b.id}>{b.type}: {b.title}</option>)}</select></div>
+              <button onClick={()=>{if(parseFloat(editForm.amount)<0){alert("Amount cannot be negative.");return;}saveExpense();}} style={{padding:"12px",background:"#3b82f6",border:"none",borderRadius:"8px",color:"white",fontWeight:"600",marginTop:"4px"}}>Save</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     if(modal.type==="activity") return <EditModal title={editForm._editId?"Edit Activity":"Add Activity"} onClose={closeModal} onSave={saveActivity} values={editForm} onChange={setField} fields={[{key:"time",label:"Time (HH:MM)",placeholder:"09:00"},{key:"title",label:"Activity Title",placeholder:"e.g. Breakfast"},{key:"location",label:"Location",placeholder:"e.g. Hotel"},{key:"notes",label:"Notes (optional)",placeholder:"Details…"}]}/>;
     if(modal.type==="packing") return <EditModal title={editForm._editId?"Edit Item":"Add Packing Item"} onClose={closeModal} onSave={savePackingItem} values={editForm} onChange={setField} fields={[{key:"category",label:"Category",type:"select",options:PACKING_CATEGORIES},{key:"item",label:"Item Name",placeholder:"e.g. Sunscreen"}]}/>;
     if(modal.type==="booking") return <EditModal title={editForm._editId?"Edit Booking":"Add Booking"} onClose={closeModal} onSave={saveBooking} values={editForm} onChange={setField} fields={[{key:"type",label:"Type",type:"select",options:BOOKING_TYPES},{key:"title",label:"Title",placeholder:"e.g. IndiGo 6E-123"},{key:"confirmationNo",label:"Confirmation / PNR",placeholder:"e.g. ABC123"},{key:"date",label:"Date",type:"date"},{key:"time",label:"Time",placeholder:"e.g. 06:30"},{key:"location",label:"Location",placeholder:"e.g. Terminal 1"},{key:"cost",label:"Cost (₹)",inputType:"number",placeholder:"0"},{key:"cancellationPolicy",label:"Cancellation Policy",placeholder:"e.g. Free till May 10"},{key:"status",label:"Status",type:"select",options:BOOKING_STATUSES},{key:"linkedDayId",label:"Link to Itinerary Day (optional)",type:"select",options:[{value:"",label:"None"},...DAYS.map(d=>({value:String(d.id),label:`${d.label} (${d.date})`}))]}]}/>;
@@ -1329,6 +1918,112 @@ expenses:[],
     if(modal.type==="note") return <EditModal title={editForm._editId?"Edit Note":"Add Note"} onClose={closeModal} onSave={saveNote} values={editForm} onChange={setField} fields={[{key:"title",label:"Title",placeholder:"e.g. Must-visit places"},{key:"category",label:"Category",type:"select",options:NOTE_CATEGORIES},{key:"content",label:"Content",type:"textarea",placeholder:"Write your note here…"}]}/>;
     if(modal.type==="quicklink") return <EditModal title={editForm._editId?"Edit Link":"Add Quick Link"} onClose={closeModal} onSave={saveQuickLink} values={editForm} onChange={setField} fields={[{key:"icon",label:"Icon (emoji)",placeholder:"🔗"},{key:"title",label:"Title",placeholder:"e.g. Google Maps"},{key:"url",label:"URL",placeholder:"e.g. maps.google.com"},{key:"description",label:"Description (optional)",placeholder:"What this link is for"}]}/>;
     if(modal.type==="checkin") return <EditModal title={editForm._editId?"Edit Check-in":"Add Check-in Item"} onClose={closeModal} onSave={saveCheckin} values={editForm} onChange={setField} fields={[{key:"item",label:"Item / Task",placeholder:"e.g. Check hotel check-out"},{key:"assignedTo",label:"Assigned To",type:"select",options:[{value:"Everyone",label:"Everyone"},...memberNames.map(n=>({value:n,label:n}))]},{key:"date",label:"Date (optional)",type:"date"}]}/>;
+
+    if(modal.type==="localinfo") return <EditModal title="🏨 Hotel & Local Trip Info" onClose={closeModal} onSave={saveLocalInfo} values={editForm} onChange={setField} fields={[{key:"hotelName",label:"Hotel Name",placeholder:"e.g. Taj Goa"},{key:"hotelAddress",label:"Hotel Address",placeholder:"e.g. Dona Paula, Goa 403004"},{key:"hotelPhone",label:"Hotel Phone",placeholder:"e.g. +91 832-123-4567"},{key:"meetingPoint",label:"Meeting Point",placeholder:"e.g. Hotel lobby at 9am"},{key:"localCurrency",label:"Local Currency",placeholder:"e.g. INR, THB, AED"},{key:"timezone",label:"Timezone",placeholder:"e.g. IST (UTC+5:30)"},{key:"transportTips",label:"Transport Tips",type:"textarea",placeholder:"e.g. Auto-rickshaws available, meter rate ₹25/km"},{key:"emergencyNotes",label:"Emergency Notes",type:"textarea",placeholder:"e.g. Nearest hospital: Goa Medical College, 2km"}]}/>;
+
+    if(modal.type==="decision") return <EditModal title={editForm._editId?"Edit Decision":"Add Group Decision"} onClose={closeModal} onSave={saveDecision} values={editForm} onChange={setField} fields={[{key:"title",label:"Decision Title",placeholder:"e.g. Restaurant for Day 3 dinner"},{key:"decision",label:"What Was Decided",type:"textarea",placeholder:"e.g. We will go to Fisherman's Wharf at 7pm"},{key:"date",label:"Date",type:"date"},{key:"madeBy",label:"Made By",type:"select",options:memberNames.map(n=>({value:n,label:n}))},{key:"status",label:"Status",type:"select",options:DECISION_STATUSES},{key:"notes",label:"Context / Notes (optional)",type:"textarea",placeholder:"Background, alternatives considered, etc."}]}/>;
+
+    if(modal.type==="dailybudget") return <EditModal title={`Set Daily Budget — ${editForm._date}`} onClose={closeModal} onSave={saveDailyBudget} values={editForm} onChange={setField} fields={[{key:"amount",label:"Daily Budget (₹)",inputType:"number",placeholder:"e.g. 5000"}]}/>;
+
+    if(modal.type==="closure"){
+      const report=generateClosureReport();
+      const catTotal=EXPENSE_CATEGORIES.reduce((s,c)=>s+(report.byCat[c]||0),0);
+      return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:"16px"}} onClick={closeModal}>
+          <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"680px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"16px",borderBottom:"1px solid #334155",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#1e293b",zIndex:1}}>
+              <h3 style={{fontWeight:"bold",color:"#f59e0b"}}>📊 Trip Closure Report</h3>
+              <div style={{display:"flex",gap:"8px"}}>
+                <button onClick={()=>exportClosurePDF(report)} style={{padding:"6px 12px",background:"#065f46",border:"none",borderRadius:"6px",color:"white",fontSize:"12px",fontWeight:"500"}}>📄 Export PDF</button>
+                <button onClick={()=>saveTripMemory(report)} style={{padding:"6px 12px",background:"#1e40af",border:"none",borderRadius:"6px",color:"white",fontSize:"12px",fontWeight:"500"}}>💾 Save Memory</button>
+                <button onClick={closeModal} style={{background:"none",border:"none",color:"white",fontSize:"24px",lineHeight:1}}>&times;</button>
+              </div>
+            </div>
+            <div style={{padding:"20px",display:"flex",flexDirection:"column",gap:"20px"}}>
+              {/* Financial */}
+              <div>
+                <h4 style={{color:"#10b981",marginBottom:"10px",fontWeight:"600"}}>💰 Financial Summary</h4>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}}>
+                  <div className="stat-card"><div style={{fontSize:"20px",fontWeight:"bold",color:"#10b981"}}>{fmtAmt(report.totalSpent)}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Total Spent</div></div>
+                  <div className="stat-card"><div style={{fontSize:"20px",fontWeight:"bold",color:"#3b82f6"}}>{fmtAmt(report.avgPerPerson)}</div><div style={{fontSize:"12px",color:"#94a3b8"}}>Avg/Person</div></div>
+                </div>
+                <div style={{fontSize:"13px",marginBottom:"10px",fontWeight:"500",color:"#94a3b8"}}>Category Breakdown:</div>
+                {EXPENSE_CATEGORIES.map(c=>{const amt=report.byCat[c]||0;if(!amt)return null;const pct=catTotal>0?Math.round((amt/catTotal)*100):0;return(
+                  <div key={c} style={{marginBottom:"6px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}><span><span className={`pill ${CAT_PILL[c]||"pill-gray"}`}>{c}</span></span><span style={{color:"#94a3b8"}}>{fmtAmt(amt)} ({pct}%)</span></div>
+                    <div className="progress-bar-wrap" style={{height:"5px"}}><div className="progress-bar-fill" style={{width:`${pct}%`,background:"#3b82f6"}}></div></div>
+                  </div>
+                );})}
+              </div>
+              {/* Per Person */}
+              <div>
+                <h4 style={{color:"#3b82f6",marginBottom:"10px",fontWeight:"600"}}>👥 Per Member</h4>
+                {(report.members||[]).map(m=>{const bal=report.balance[m.name]||0;return(
+                  <div key={m.name} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155",fontSize:"13px"}}>
+                    <span>{m.name}</span>
+                    <span style={{display:"flex",gap:"12px"}}>
+                      <span style={{color:"#94a3b8"}}>Paid {fmtAmt(report.paidBy[m.name]||0)}</span>
+                      <span style={{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#64748b",fontWeight:"600"}}>{bal>0.01?`gets ${fmtAmt(bal)}`:bal<-0.01?`owes ${fmtAmt(Math.abs(bal))}`:"settled"}</span>
+                    </span>
+                  </div>
+                );})}
+              </div>
+              {/* Top 5 Expenses */}
+              {report.top5.length>0&&<div>
+                <h4 style={{color:"#f59e0b",marginBottom:"10px",fontWeight:"600"}}>🏆 Top 5 Expenses</h4>
+                {report.top5.map((e,i)=>(
+                  <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #334155",fontSize:"13px"}}>
+                    <span>{i+1}. {e.description}</span><span style={{color:"#f59e0b",fontWeight:"600"}}>{fmtAmt(e.amount)}</span>
+                  </div>
+                ))}
+              </div>}
+              {/* Completion */}
+              <div>
+                <h4 style={{color:"#a78bfa",marginBottom:"10px",fontWeight:"600"}}>✅ Completion Rates</h4>
+                {[["🎒 Packing",report.packedCount,report.totalItems],["✅ Tasks",report.tasksDone,report.totalTasks],["☑️ Check-ins",report.ciDone,report.totalCI]].map(([label,done,total])=>{
+                  const pct=total>0?Math.round((done/total)*100):0;
+                  return(<div key={label} style={{marginBottom:"8px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"3px"}}><span>{label}</span><span style={{color:"#94a3b8"}}>{done}/{total} ({pct}%)</span></div>
+                    <div className="progress-bar-wrap" style={{height:"5px"}}><div className="progress-bar-fill" style={{width:`${pct}%`,background:pct===100?"#10b981":pct>60?"#f59e0b":"#3b82f6"}}></div></div>
+                  </div>);
+                })}
+              </div>
+              {/* Bookings */}
+              {Object.keys(report.byType).length>0&&<div>
+                <h4 style={{color:"#60a5fa",marginBottom:"10px",fontWeight:"600"}}>📋 Bookings Summary</h4>
+                <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                  {Object.entries(report.byType).map(([type,count])=><span key={type} className="pill pill-blue">{TYPE_ICON[type]||"📌"} {count} {type}</span>)}
+                </div>
+              </div>}
+              {/* Decisions */}
+              <div>
+                <h4 style={{color:"#f59e0b",marginBottom:"10px",fontWeight:"600"}}>🗳️ Decisions ({(report.decisions||[]).length})</h4>
+                {(report.decisions||[]).length===0?<div style={{color:"#64748b",fontSize:"13px"}}>No decisions logged.</div>:(report.decisions||[]).map(d=>(
+                  <div key={d.id} style={{padding:"6px 0",borderBottom:"1px solid #334155",fontSize:"13px"}}>
+                    <span className={`pill ${DECISION_PILL[d.status]||"pill-gray"}`} style={{marginRight:"8px"}}>{d.status}</span>
+                    <strong>{d.title}</strong>
+                  </div>
+                ))}
+              </div>
+              {/* Settlements */}
+              <div>
+                <h4 style={{color:"#10b981",marginBottom:"10px",fontWeight:"600"}}>🤝 Settlement Instructions</h4>
+                {(report.settlements||[]).length===0?<div style={{color:"#10b981",fontSize:"13px"}}>✅ All settled — no payments needed!</div>:(report.settlements||[]).map((s,i)=>(
+                  <div key={i} style={{padding:"8px",background:"#0f172a",borderRadius:"6px",marginBottom:"6px",fontSize:"13px",display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                    <span style={{color:"#ef4444",fontWeight:"600"}}>{s.from}</span>
+                    <span style={{color:"#64748b"}}>pays</span>
+                    <span style={{color:"#10b981",fontWeight:"700"}}>{fmtAmt(s.amount)}</span>
+                    <span style={{color:"#64748b"}}>to</span>
+                    <span style={{color:"#3b82f6",fontWeight:"600"}}>{s.to}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if(modal.type==="poll") return(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:"16px"}} onClick={closeModal}>
         <div style={{background:"#1e293b",borderRadius:"16px",maxWidth:"500px",width:"100%",maxHeight:"90vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
@@ -1364,9 +2059,11 @@ expenses:[],
     {id:"tasks",    label:"✅ Tasks",      render:renderTasks},
     {id:"documents",label:"🛂 Docs",       render:renderDocuments},
     {id:"polls",    label:"📊 Polls",      render:renderPolls},
+    {id:"decisions",label:"🗳️ Decisions",  render:renderDecisions},
     {id:"notes",    label:"📝 Notes",      render:renderNotes},
     {id:"links",    label:"🔗 Links",      render:renderQuickLinks},
     {id:"checkins", label:"☑️ Check-ins",  render:renderCheckins},
+    {id:"chat",     label:unreadChat>0?`💬 Chat (${unreadChat})`:"💬 Chat", render:renderChat},
     {id:"members",  label:"👥 Members",    render:renderMembers},
     {id:"settings", label:"⚙️ Settings",   render:renderSettings}
   ];
@@ -1374,6 +2071,9 @@ expenses:[],
   // ========== LAYOUT ==========
   return(
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}}>
+
+      {/* ── Offline Banner ── */}
+      {isOffline&&<div className="offline-banner">⚠️ OFFLINE MODE — Changes will sync when connection returns. Showing cached data.</div>}
 
       {/* ── Sticky Header ── */}
       <div style={{position:"sticky",top:0,zIndex:10,background:"rgba(15,23,42,0.97)",backdropFilter:"blur(10px)",borderBottom:"1px solid #334155",padding:"10px 16px"}}>
@@ -1383,7 +2083,7 @@ expenses:[],
             <span style={{fontSize:"22px"}}>✈️</span>
             <div>
               <h1 style={{fontWeight:"bold",fontSize:"15px",color:"white",lineHeight:"1.2"}}>Trip Planner PRO</h1>
-              <div style={{fontSize:"10px",color:"#94a3b8"}}>{authUser.username}{isAdmin?" (Admin)":""} · {isSyncing?"⏳":"✅"}</div>
+              <div style={{fontSize:"10px",color:isOffline?"#f87171":"#94a3b8"}}>{authUser.username}{isAdmin?" (Admin)":""} · {isSyncing?"⏳ Saving…":isOffline?"📵 Offline":lastSynced?`✅ ${Math.round((Date.now()-lastSynced.getTime())/60000)}m ago`:"✅"}</div>
             </div>
           </div>
           {/* Search + Bell */}
@@ -1431,6 +2131,12 @@ expenses:[],
             </button>
           ))}
         </div>
+        {/* ── Quick Actions Bar ── */}
+        <div style={{maxWidth:"1200px",margin:"6px auto 0",display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"2px"}}>
+          {[["+ Expense","expense"],["+ Booking","booking"],["+ Task","task"],["+ Note","note"],["+ Decision","decision"],["+ Check-in","checkin"]].map(([label,type])=>(
+            <button key={type} onClick={()=>handleFAB(type)} style={{padding:"3px 10px",background:"rgba(59,130,246,0.1)",border:"1px solid #3b82f622",borderRadius:"20px",color:"#60a5fa",fontSize:"11px",fontWeight:"500",whiteSpace:"nowrap"}}>{label}</button>
+          ))}
+        </div>
       </div>
 
       {/* ── Page Content ── */}
@@ -1440,6 +2146,19 @@ expenses:[],
 
       {renderModal()}
       <FAB/>
+      {/* ── Confirm Modal ── */}
+      {confirmModal&&(
+        <div className="confirm-overlay" onClick={closeConfirm}>
+          <div style={{background:"#1e293b",borderRadius:"16px",padding:"24px",maxWidth:"380px",width:"100%",border:"1px solid #ef444444"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:"24px",textAlign:"center",marginBottom:"12px"}}>⚠️</div>
+            <p style={{color:"#cbd5e1",fontSize:"14px",lineHeight:"1.6",textAlign:"center",marginBottom:"20px"}}>{confirmModal.message}</p>
+            <div style={{display:"flex",gap:"10px",justifyContent:"center"}}>
+              <button onClick={closeConfirm} style={{padding:"10px 24px",background:"#334155",border:"none",borderRadius:"8px",color:"white",fontWeight:"500"}}>Cancel</button>
+              <button onClick={()=>{confirmModal.onConfirm();closeConfirm();}} style={{padding:"10px 24px",background:"#ef4444",border:"none",borderRadius:"8px",color:"white",fontWeight:"600"}}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
