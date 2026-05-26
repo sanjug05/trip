@@ -264,7 +264,6 @@ const KEYWORD_CATEGORIES = [
   {pattern:/movie|tour|entry|ticket|museum|show|concert|park|activity/i, cat:"Activities"},
   {pattern:/mall|gift|shop|shopping|souvenir|market|buy/i, cat:"Shopping"}
 ];
-
 const SENDER_COLORS = {Sanjug:"#3b82f6",Manishk:"#10b981",Atikab:"#a78bfa"};
 const CAT_EMOJI = {Food:"🍽️",Transport:"🚕",Stay:"🏨",Activities:"🎯",Shopping:"🛍️",Misc:"📦"};
 const CAT_COLOR = {Food:"#f59e0b",Transport:"#3b82f6",Stay:"#a78bfa",Activities:"#10b981",Shopping:"#ec4899",Misc:"#64748b"};
@@ -338,7 +337,6 @@ const calcExpenseSummary = (expenses, members) => {
   const paidBy = {}, share = {}, byCat = {};
   names.forEach(n => { paidBy[n] = 0; share[n] = 0; });
   EXPENSE_CATEGORIES.forEach(c => { byCat[c] = 0; });
-  
   (expenses || []).forEach(e => {
     const amt = parseFloat(e.amount) || 0;
     totalSpent += amt;
@@ -348,66 +346,23 @@ const calcExpenseSummary = (expenses, members) => {
     among.forEach(p => { share[p] = (share[p] || 0) + s; });
     byCat[e.category || "Misc"] = (byCat[e.category || "Misc"] || 0) + amt;
   });
-  
   const balance = {};
-  names.forEach(n => { 
-    // Round to 2 decimal places to avoid floating point issues
-    balance[n] = Math.round(((paidBy[n] || 0) - (share[n] || 0)) * 100) / 100;
-  });
-  
-  // Create lists of who owes money (negative balance) and who is owed money (positive balance)
-  const debtors = [];
-  const creditors = [];
-  
-  names.forEach(name => {
-    if (balance[name] < -0.01) {
-      debtors.push({ name: name, amount: Math.abs(balance[name]) });
-    } else if (balance[name] > 0.01) {
-      creditors.push({ name: name, amount: balance[name] });
-    }
-  });
-  
-  // Sort by amount descending for better optimization
-  debtors.sort((a, b) => b.amount - a.amount);
-  creditors.sort((a, b) => b.amount - a.amount);
-  
+  names.forEach(n => { balance[n] = (paidBy[n] || 0) - (share[n] || 0); });
   const settlements = [];
-  let dIndex = 0, cIndex = 0;
-  
-  while (dIndex < debtors.length && cIndex < creditors.length) {
-    const debtor = debtors[dIndex];
-    const creditor = creditors[cIndex];
-    
-    // Calculate settlement amount (minimum of what's owed and what's due)
-    const settleAmount = Math.min(debtor.amount, creditor.amount);
-    
-    if (settleAmount > 0.01) {
-      settlements.push({
-        from: debtor.name,
-        to: creditor.name,
-        amount: Math.round(settleAmount * 100) / 100
-      });
-    }
-    
-    // Reduce amounts
-    debtor.amount = Math.round((debtor.amount - settleAmount) * 100) / 100;
-    creditor.amount = Math.round((creditor.amount - settleAmount) * 100) / 100;
-    
-    // Move to next if amount is settled (within 1 paisa tolerance)
-    if (debtor.amount < 0.01) dIndex++;
-    if (creditor.amount < 0.01) cIndex++;
+  const debtors = names.filter(n => balance[n] < -0.01).map(n => ({ name: n, amt: -balance[n] })).sort((a, b) => b.amt - a.amt);
+  const creditors = names.filter(n => balance[n] > 0.01).map(n => ({ name: n, amt: balance[n] })).sort((a, b) => b.amt - a.amt);
+  let di = 0, ci = 0;
+  while (di < debtors.length && ci < creditors.length) {
+    const pay = Math.min(debtors[di].amt, creditors[ci].amt);
+    if (pay > 0.01) settlements.push({ from: debtors[di].name, to: creditors[ci].name, amount: pay });
+    debtors[di].amt -= pay;
+    creditors[ci].amt -= pay;
+    if (debtors[di].amt < 0.01) di++;
+    if (creditors[ci].amt < 0.01) ci++;
   }
-  
-  return { 
-    totalSpent, 
-    avgPerPerson: names.length > 0 ? totalSpent / names.length : 0, 
-    paidBy, 
-    share, 
-    balance, 
-    settlements, 
-    byCat 
-  };
+  return { totalSpent, avgPerPerson: names.length > 0 ? totalSpent / names.length : 0, paidBy, share, balance, settlements, byCat };
 };
+
 const BackupSystem = {
   save: (data) => {
     try {
@@ -740,15 +695,7 @@ const App = () => {
     if (s) setAuthUser(JSON.parse(s));
     else setLoading(false);
   }, []);
-  // Force recalc of settlements on mount to clear any stale data
-React.useEffect(() => {
-  if (tripData && tripData.expenses) {
-    // This will trigger a recalculation of expSummary and getSettlements
-    // No actual data change, just ensuring fresh calculations
-    const dummy = { ...tripData };
-    setTripData(dummy);
-  }
-}, []);
+  
   React.useEffect(() => {
     const checkTripMode = () => {
       const tripStart = new Date("2026-05-17");
@@ -1271,7 +1218,17 @@ React.useEffect(() => {
   const handleLogout = () => { localStorage.removeItem("trip_auth"); setAuthUser(null); setTripData(null); setLoading(false); };
   const showConfirm = (message, onConfirm) => setConfirmModal({ message, onConfirm });
   const closeConfirm = () => setConfirmModal(null);
-  
+
+  // ── Settlement Management (Feature 1) ──
+  const getSettlements = React.useMemo(() => {
+    const paid = tripData?.settledPayments || {};
+    return (expSummary.settlements || []).map(s => {
+      const key = s.from + "|" + s.to;
+      const paidEntry = paid[key];
+      return { ...s, key, isPaid: !!paidEntry, paidAt: paidEntry?.at, paidNote: paidEntry?.note, paidAmount: paidEntry?.amount };
+    });
+  }, [expSummary.settlements, tripData?.settledPayments]);
+
   const markSettlementPaid = (s, note="") => {
     const paid = { ...(tripData?.settledPayments || {}) };
     paid[s.key] = { at: new Date().toISOString(), note, amount: s.amount, from: s.from, to: s.to };
@@ -1301,34 +1258,21 @@ React.useEffect(() => {
     if (granted) NotifSystem.show("Trip Planner PRO", "Notifications enabled! You'll get trip reminders. ✅");
   };
 
-// ── Settlement Management (Feature 1) ──
-const getSettlements = React.useMemo(() => {
-  const paid = tripData?.settledPayments || {};
-  // Filter out any settlements where from and to are the same person
-  const validSettlements = (expSummary.settlements || []).filter(s => s.from !== s.to);
-  return validSettlements.map(s => {
-    const key = s.from + "|" + s.to;
-    const paidEntry = paid[key];
-    return { ...s, key, isPaid: !!paidEntry, paidAt: paidEntry?.at, paidNote: paidEntry?.note, paidAmount: paidEntry?.amount };
-  });
-}, [expSummary.settlements, tripData?.settledPayments]);
   const getUpcomingNotifs = React.useMemo(() => {
-  const items = [];
-  const td = today();
-  const tom = new Date(Date.now() + 86400000).toISOString().slice(0,10);
-  (tripData?.bookings||[]).filter(b=>b.date>=td&&b.date<=tom&&b.status!=="cancelled").forEach(b=>
-    items.push({id:"b"+b.id,type:"booking",title:b.title,detail:b.date+(b.time?" · "+b.time:""),urgent:b.date===td})
-  );
-  (tripData?.tasks||[]).filter(t=>t.dueDate&&t.dueDate<=tom&&t.status!=="done").forEach(t=>
-    items.push({id:"t"+t.id,type:"task",title:t.title,detail:"Due: "+t.dueDate,urgent:t.dueDate<td})
-  );
-  // Use getSettlements to check pending settlements
-  const pendingSettleCount = (getSettlements || []).filter(s => !s.isPaid).length;
-  if (pendingSettleCount > 0)
-    items.push({id:"settle",type:"expense",title:"Pending Settlements",detail:pendingSettleCount+" payment(s) due",urgent:false});
-  (tripData?.packingList||[]).filter(p=>!p.checked).length > 3 && items.push({id:"pack",type:"packing",title:"Packing Incomplete",detail:(tripData?.packingList||[]).filter(p=>!p.checked).length+" items unpacked",urgent:false});
-  return items;
-}, [tripData, getSettlements]);
+    const items = [];
+    const td = today();
+    const tom = new Date(Date.now() + 86400000).toISOString().slice(0,10);
+    (tripData?.bookings||[]).filter(b=>b.date>=td&&b.date<=tom&&b.status!=="cancelled").forEach(b=>
+      items.push({id:"b"+b.id,type:"booking",title:b.title,detail:b.date+(b.time?" · "+b.time:""),urgent:b.date===td})
+    );
+    (tripData?.tasks||[]).filter(t=>t.dueDate&&t.dueDate<=tom&&t.status!=="done").forEach(t=>
+      items.push({id:"t"+t.id,type:"task",title:t.title,detail:"Due: "+t.dueDate,urgent:t.dueDate<td})
+    );
+    if ((expSummary.settlements||[]).length > 0)
+      items.push({id:"settle",type:"expense",title:"Pending Settlements",detail:(expSummary.settlements||[]).length+" payment(s) due",urgent:false});
+    (tripData?.packingList||[]).filter(p=>!p.checked).length > 3 && items.push({id:"pack",type:"packing",title:"Packing Incomplete",detail:(tripData?.packingList||[]).filter(p=>!p.checked).length+" items unpacked",urgent:false});
+    return items;
+  }, [tripData, expSummary]);
 
   // ── Advanced Snapshot (Feature 3) ──
   const createSnapshot = () => {
@@ -1378,19 +1322,18 @@ const getSettlements = React.useMemo(() => {
   };
 
   const getReminders = () => {
-  const list = [];
-  const td = today();
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  (tripData?.bookings || []).forEach(b => { if (b.date >= td && b.date <= tomorrow && b.status !== "cancelled") list.push({ icon: "📅", msg: "Booking: " + b.title + " on " + b.date }); });
-  (tripData?.tasks || []).filter(t => t.dueDate === td && t.status !== "done").forEach(t => list.push({ icon: "⏰", msg: "Task due today: " + t.title }));
-  // FIXED: Use getSettlements instead of expSummary.settlements
-  const pendingCount = (getSettlements || []).filter(s => !s.isPaid).length;
-  if (pendingCount > 0) {
-    list.push({ icon: "💰", msg: pendingCount + " pending settlement(s)" });
-  }
-  (tripData?.polls || []).forEach(p => { const tv = Object.values(p.votes || {}).reduce((a, b) => a + b, 0); if (tv === 0) list.push({ icon: "📊", msg: "Poll needs votes: \"" + (p.question || "").slice(0, 30) + "…\"" }); });
-  return list;
-};
+    const list = [];
+    const td = today();
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    (tripData?.bookings || []).forEach(b => { if (b.date >= td && b.date <= tomorrow && b.status !== "cancelled") list.push({ icon: "📅", msg: "Booking: " + b.title + " on " + b.date }); });
+    (tripData?.tasks || []).filter(t => t.dueDate === td && t.status !== "done").forEach(t => list.push({ icon: "⏰", msg: "Task due today: " + t.title }));
+    if (expSummary.settlements?.length > 0) {
+      const old2 = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+      if ((tripData?.expenses || []).some(e => e.date <= old2)) list.push({ icon: "💰", msg: expSummary.settlements.length + " pending settlement(s)" });
+    }
+    (tripData?.polls || []).forEach(p => { const tv = Object.values(p.votes || {}).reduce((a, b) => a + b, 0); if (tv === 0) list.push({ icon: "📊", msg: "Poll needs votes: \"" + (p.question || "").slice(0, 30) + "…\"" }); });
+    return list;
+  };
   const reminders = getReminders();
   // ========== SYNC BANNER ==========
   const SyncBanner = React.memo(() => {
@@ -1479,7 +1422,7 @@ const getSettlements = React.useMemo(() => {
     const alerts = [];
     (tripData?.bookings || []).filter(b => (b.date === td || b.date === tom) && b.status !== "cancelled").forEach(b => alerts.push({ icon: "📅", msg: (b.date === td ? "Today" : "Tomorrow") + ": " + b.title, go: () => setActiveTab("bookings"), btn: "View" }));
     (tripData?.tasks || []).filter(t => t.dueDate && t.dueDate <= td && t.status !== "done").forEach(t => alerts.push({ icon: t.dueDate < td ? "🚨" : "⏰", msg: "Task " + (t.dueDate < td ? "overdue" : "due today") + ": " + t.title + " (" + t.assignedTo + ")", go: () => setActiveTab("tasks"), btn: "View" }));
-if ((getSettlements || []).filter(s => !s.isPaid).length > 0) alerts.push({ icon: "💰", msg: (getSettlements || []).filter(s => !s.isPaid).length + " unsettled expense(s)", go: () => setActiveTab("expenses"), btn: "Settle" });
+    if (expSummary.settlements?.length > 0) alerts.push({ icon: "💰", msg: expSummary.settlements.length + " unsettled expense(s)", go: () => setActiveTab("expenses"), btn: "Settle" });
     (tripData?.polls || []).forEach(p => { const tv = Object.values(p.votes || {}).reduce((a, b) => a + b, 0); if (tv === 0) alerts.push({ icon: "📊", msg: "Poll: \"" + (p.question || "").slice(0, 40) + "\"", go: () => setActiveTab("polls"), btn: "Vote" }); });
     (tripData?.checkins || []).filter(c => c.date === td && !c.checked).forEach(c => alerts.push({ icon: "☑️", msg: "Check-in today: " + c.item + " (" + c.assignedTo + ")", go: () => setActiveTab("checkins"), btn: "Mark" }));
     return React.createElement("div", { style: { background: "#1e293b", borderRadius: "12px", padding: "16px", border: alerts.length > 0 ? "1px solid #ef444433" : "1px solid #10b98133" } },
@@ -1543,123 +1486,119 @@ if ((getSettlements || []).filter(s => !s.isPaid).length > 0) alerts.push({ icon
       React.createElement("span", { style: { transform: showFAB ? "rotate(45deg)" : "none", display: "inline-block", transition: "transform 0.2s", fontSize: "28px" } }, showFAB ? "×" : "+")
     )
   );
-// ========== DASHBOARD ==========
-const renderDashboard = () => {
-  const packed = (tripData.packingList || []).filter(i => i.checked).length;
-  const total = (tripData.packingList || []).length;
-  const pct = total > 0 ? Math.round((packed / total) * 100) : 0;
-  const td = today();
-  const todayActs = ((tripData.itinerary || []).find(d => d.date === td)?.activities || []);
-  const myTasks = (tripData.tasks || []).filter(t => t.assignedTo === authUser.username && t.status !== "done");
-  const upBookings = (tripData.bookings || []).filter(b => b.date >= td && b.status !== "cancelled").slice(0, 3);
-  const li = tripData.localInfo || {};
-  const tripStart = new Date("2026-05-17");
-  tripStart.setHours(0, 0, 0, 0);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const daysPassed = Math.min(Math.max(Math.ceil((now - tripStart) / 86400000), 0), 10);
-  const tripProgressPct = Math.round((daysPassed / 10) * 100);
-  const todayBudget = parseFloat((tripData.dailyBudgets || {})[td]) || 0;
-  const todayActual = (tripData.expenses || []).filter(e => e.date === td).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-  const todayBudgetPct = todayBudget > 0 ? Math.min(100, Math.round((todayActual / todayBudget) * 100)) : 0;
-  const pendingDecisions = (tripData.decisions || []).filter(d => d.status === "Proposed");
-  const pendingSettlementsForDashboard = (getSettlements || []).filter(s => !s.isPaid);
-  
-  return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
-    React.createElement(SyncBanner, null),
-    React.createElement(TodayAttentionCard, null),
-    React.createElement(ActivityFeedWidget, null),
-    (li.hotelName || li.hotelAddress || li.meetingPoint || li.emergencyNotes) && React.createElement("div", { className: "section-card", style: { border: "1px solid #1e4a7a", background: "linear-gradient(135deg,#1e293b,#1e3a5f)" } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
-        React.createElement("h3", { style: { fontWeight: "700", color: "#60a5fa" } }, "🏨 Local Trip Info"),
-        isAdmin && React.createElement("button", { onClick: () => openModal("localinfo", { ...LOCAL_INFO_DEFAULTS, ...li }), style: { padding: "4px 10px", background: "rgba(59,130,246,0.2)", border: "1px solid #3b82f644", borderRadius: "6px", color: "#60a5fa", fontSize: "12px" } }, "✏️ Edit")
+  // ========== DASHBOARD ==========
+  const renderDashboard = () => {
+    const packed = (tripData.packingList || []).filter(i => i.checked).length;
+    const total = (tripData.packingList || []).length;
+    const pct = total > 0 ? Math.round((packed / total) * 100) : 0;
+    const td = today();
+    const todayActs = ((tripData.itinerary || []).find(d => d.date === td)?.activities || []);
+    const myTasks = (tripData.tasks || []).filter(t => t.assignedTo === authUser.username && t.status !== "done");
+    const upBookings = (tripData.bookings || []).filter(b => b.date >= td && b.status !== "cancelled").slice(0, 3);
+    const li = tripData.localInfo || {};
+    const tripStart = new Date("2026-05-17");
+    tripStart.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const daysPassed = Math.min(Math.max(Math.ceil((now - tripStart) / 86400000), 0), 10);
+    const tripProgressPct = Math.round((daysPassed / 10) * 100);
+    const todayBudget = parseFloat((tripData.dailyBudgets || {})[td]) || 0;
+    const todayActual = (tripData.expenses || []).filter(e => e.date === td).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    const todayBudgetPct = todayBudget > 0 ? Math.min(100, Math.round((todayActual / todayBudget) * 100)) : 0;
+    const pendingDecisions = (tripData.decisions || []).filter(d => d.status === "Proposed");
+    
+    return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "20px" } },
+      React.createElement(SyncBanner, null),
+      React.createElement(TodayAttentionCard, null),
+      React.createElement(ActivityFeedWidget, null),
+      (li.hotelName || li.hotelAddress || li.meetingPoint || li.emergencyNotes) && React.createElement("div", { className: "section-card", style: { border: "1px solid #1e4a7a", background: "linear-gradient(135deg,#1e293b,#1e3a5f)" } },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
+          React.createElement("h3", { style: { fontWeight: "700", color: "#60a5fa" } }, "🏨 Local Trip Info"),
+          isAdmin && React.createElement("button", { onClick: () => openModal("localinfo", { ...LOCAL_INFO_DEFAULTS, ...li }), style: { padding: "4px 10px", background: "rgba(59,130,246,0.2)", border: "1px solid #3b82f644", borderRadius: "6px", color: "#60a5fa", fontSize: "12px" } }, "✏️ Edit")
+        ),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "10px" } },
+          li.hotelName && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "🏨 Hotel: "), React.createElement("strong", { style: { color: "white" } }, li.hotelName)),
+          li.hotelAddress && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📍 Address: "), React.createElement("a", { href: "https://www.google.com/maps/search/" + encodeURIComponent(li.hotelAddress), target: "_blank", rel: "noopener noreferrer", style: { color: "#60a5fa" } }, li.hotelAddress)),
+          li.hotelPhone && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📞 Phone: "), React.createElement("strong", { style: { color: "white" } }, li.hotelPhone)),
+          li.meetingPoint && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📌 Meeting Point: "), React.createElement("strong", { style: { color: "white" } }, li.meetingPoint)),
+          li.localCurrency && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "💱 Local Currency: "), React.createElement("strong", { style: { color: "white" } }, li.localCurrency)),
+          li.timezone && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "🕐 Timezone: "), React.createElement("strong", { style: { color: "white" } }, li.timezone))
+        ),
+        li.transportTips && React.createElement("div", { style: { marginTop: "10px", fontSize: "13px", color: "#94a3b8", padding: "8px", background: "rgba(0,0,0,0.2)", borderRadius: "6px" } }, "🚕 ", React.createElement("strong", null, "Transport:"), " ", li.transportTips),
+        li.emergencyNotes && React.createElement("div", { style: { marginTop: "8px", fontSize: "13px", color: "#fca5a5", padding: "8px", background: "rgba(239,68,68,0.1)", borderRadius: "6px" } }, "🚨 ", React.createElement("strong", null, "Emergency:"), " ", li.emergencyNotes)
       ),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: "10px" } },
-        li.hotelName && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "🏨 Hotel: "), React.createElement("strong", { style: { color: "white" } }, li.hotelName)),
-        li.hotelAddress && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📍 Address: "), React.createElement("a", { href: "https://www.google.com/maps/search/" + encodeURIComponent(li.hotelAddress), target: "_blank", rel: "noopener noreferrer", style: { color: "#60a5fa" } }, li.hotelAddress)),
-        li.hotelPhone && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📞 Phone: "), React.createElement("strong", { style: { color: "white" } }, li.hotelPhone)),
-        li.meetingPoint && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "📌 Meeting Point: "), React.createElement("strong", { style: { color: "white" } }, li.meetingPoint)),
-        li.localCurrency && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "💱 Local Currency: "), React.createElement("strong", { style: { color: "white" } }, li.localCurrency)),
-        li.timezone && React.createElement("div", { style: { fontSize: "13px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "🕐 Timezone: "), React.createElement("strong", { style: { color: "white" } }, li.timezone))
+      !li.hotelName && isAdmin && React.createElement("div", { className: "section-card", style: { border: "1px dashed #334155", textAlign: "center", padding: "20px" } },
+        React.createElement("div", { style: { color: "#64748b", marginBottom: "8px" } }, "🏨 No local trip info yet"),
+        React.createElement("button", { onClick: () => openModal("localinfo", { ...LOCAL_INFO_DEFAULTS, ...li }), style: { padding: "8px 16px", background: "#3b82f6", border: "none", borderRadius: "8px", color: "white", fontSize: "13px" } }, "+ Add Hotel & Local Info")
       ),
-      li.transportTips && React.createElement("div", { style: { marginTop: "10px", fontSize: "13px", color: "#94a3b8", padding: "8px", background: "rgba(0,0,0,0.2)", borderRadius: "6px" } }, "🚕 ", React.createElement("strong", null, "Transport:"), " ", li.transportTips),
-      li.emergencyNotes && React.createElement("div", { style: { marginTop: "8px", fontSize: "13px", color: "#fca5a5", padding: "8px", background: "rgba(239,68,68,0.1)", borderRadius: "6px" } }, "🚨 ", React.createElement("strong", null, "Emergency:"), " ", li.emergencyNotes)
-    ),
-    !li.hotelName && isAdmin && React.createElement("div", { className: "section-card", style: { border: "1px dashed #334155", textAlign: "center", padding: "20px" } },
-      React.createElement("div", { style: { color: "#64748b", marginBottom: "8px" } }, "🏨 No local trip info yet"),
-      React.createElement("button", { onClick: () => openModal("localinfo", { ...LOCAL_INFO_DEFAULTS, ...li }), style: { padding: "8px 16px", background: "#3b82f6", border: "none", borderRadius: "8px", color: "white", fontSize: "13px" } }, "+ Add Hotel & Local Info")
-    ),
-    React.createElement(CountdownWidget, null),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } }, React.createElement("span", { style: { fontWeight: "600" } }, "🗓️ Trip Progress"), React.createElement("span", { style: { color: "#3b82f6", fontWeight: "600" } }, "Day " + daysPassed + "/10 (" + tripProgressPct + "%)")),
-      React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: tripProgressPct + "%", background: "linear-gradient(90deg,#3b82f6,#10b981)" } })),
-      todayBudget > 0 && React.createElement("div", { style: { marginTop: "10px" } },
-        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "Today's Budget"), React.createElement("span", { style: { color: todayBudgetPct > 90 ? "#ef4444" : todayBudgetPct > 70 ? "#f59e0b" : "#10b981", fontWeight: "600" } }, fmtAmt(todayActual) + " / " + fmtAmt(todayBudget) + " (" + todayBudgetPct + "%)")),
-        React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: todayBudgetPct + "%", background: todayBudgetPct > 90 ? "#ef4444" : todayBudgetPct > 70 ? "#f59e0b" : "#10b981" } }))
+      React.createElement(CountdownWidget, null),
+      React.createElement("div", { className: "section-card" },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } }, React.createElement("span", { style: { fontWeight: "600" } }, "🗓️ Trip Progress"), React.createElement("span", { style: { color: "#3b82f6", fontWeight: "600" } }, "Day " + daysPassed + "/10 (" + tripProgressPct + "%)")),
+        React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: tripProgressPct + "%", background: "linear-gradient(90deg,#3b82f6,#10b981)" } })),
+        todayBudget > 0 && React.createElement("div", { style: { marginTop: "10px" } },
+          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" } }, React.createElement("span", { style: { color: "#94a3b8" } }, "Today's Budget"), React.createElement("span", { style: { color: todayBudgetPct > 90 ? "#ef4444" : todayBudgetPct > 70 ? "#f59e0b" : "#10b981", fontWeight: "600" } }, fmtAmt(todayActual) + " / " + fmtAmt(todayBudget) + " (" + todayBudgetPct + "%)")),
+          React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: todayBudgetPct + "%", background: todayBudgetPct > 90 ? "#ef4444" : todayBudgetPct > 70 ? "#f59e0b" : "#10b981" } }))
+        )
+      ),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "12px" } },
+        [{ l: "Members", v: (tripData.members || []).length, c: "#3b82f6" }, { l: "Total Spent", v: fmtAmt(expSummary.totalSpent), c: "#10b981" }, { l: "Avg/Person", v: fmtAmt(expSummary.avgPerPerson), c: "#f59e0b" }, { l: "Packed", v: packed + "/" + total + " (" + pct + "%)", c: "#a78bfa" }].map(c => React.createElement("div", { key: c.l, className: "stat-card" }, React.createElement("div", { style: { fontSize: "18px", fontWeight: "bold", color: c.c, wordBreak: "break-word" } }, c.v), React.createElement("div", { style: { fontSize: "12px", color: "#94a3b8", marginTop: "4px" } }, c.l)))
+      ),
+      React.createElement(WeatherWidget, null),
+      pendingDecisions.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #f59e0b33" } },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#f59e0b" } }, "🗳️ Decisions Needing Attention (" + pendingDecisions.length + ")"),
+        pendingDecisions.slice(0, 3).map(d => React.createElement("div", { key: d.id, style: { display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid #334155", padding: "8px 0" } },
+          React.createElement("span", { className: "pill pill-yellow" }, "Proposed"),
+          React.createElement("span", { style: { flex: 1, fontSize: "13px" } }, d.title),
+          React.createElement("button", { onClick: () => setActiveTab("decisions"), style: { padding: "3px 10px", background: "rgba(245,158,11,0.15)", border: "1px solid #f59e0b44", borderRadius: "6px", color: "#f59e0b", fontSize: "12px" } }, "View →")
+        ))
+      ),
+      React.createElement("div", { className: "section-card" },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "📅 Today's Agenda"),
+        sortActivities(todayActs).length === 0 ? React.createElement("div", { style: { color: "#64748b", fontSize: "13px" } }, "No activities scheduled today.") : sortActivities(todayActs).map((a, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #334155", padding: "8px 0" } },
+          React.createElement("span", { style: { color: "#3b82f6", fontSize: "12px", fontFamily: "monospace", minWidth: "48px" } }, a.time),
+          React.createElement("span", { style: { flex: 1 } }, a.title),
+          a.location && React.createElement("span", { style: { fontSize: "11px", color: "#94a3b8" } }, a.location)
+        ))
+      ),
+      upBookings.length > 0 && React.createElement("div", { className: "section-card" },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "📋 Upcoming Bookings"),
+        upBookings.map(b => React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #334155", padding: "8px 0" } },
+          React.createElement("span", { style: { fontSize: "18px" } }, TYPE_ICON[b.type] || "📌"),
+          React.createElement("div", { style: { flex: 1 } }, React.createElement("div", { style: { fontWeight: "500" } }, b.title), React.createElement("div", { style: { fontSize: "11px", color: "#94a3b8" } }, b.date + (b.time ? " · " + b.time : ""))),
+          React.createElement("span", { className: "pill " + (b.status === "confirmed" ? "pill-green" : b.status === "pending" ? "pill-yellow" : "pill-red") }, b.status)
+        ))
+      ),
+      myTasks.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #3b82f644" } },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#3b82f6" } }, "✅ My Pending Tasks (" + myTasks.length + ")"),
+        myTasks.slice(0, 4).map(t => React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #334155", padding: "8px 0" } },
+          React.createElement("button", { onClick: () => setTaskStatus(t.id, "done"), style: { background: "none", border: "1px solid #334155", borderRadius: "4px", color: "#64748b", padding: "2px 8px", fontSize: "11px" } }, "Done"),
+          React.createElement("span", { style: { flex: 1, fontSize: "14px" } }, t.title),
+          t.dueDate && React.createElement("span", { style: { fontSize: "11px", color: "#f59e0b" } }, "📅 " + t.dueDate)
+        ))
+      ),
+      React.createElement("div", { className: "section-card" },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "💰 Balance Summary"),
+        (tripData.members || []).map(m => { const bal = expSummary.balance[m.name] || 0; return React.createElement("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #334155" } },
+          React.createElement("span", null, m.name, m.isAdmin && React.createElement("span", { style: { fontSize: "10px", color: "#f59e0b", marginLeft: "6px" } }, "(Admin)")),
+          React.createElement("span", { style: { color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8", fontWeight: "600" } }, bal > 0.01 ? "+" + fmtAmt(bal) : bal < -0.01 ? "−" + fmtAmt(Math.abs(bal)) : "Settled ✓")
+        ); })
+      ),
+      expSummary.settlements.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
+        React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#10b981" } }, "✅ Settlement Suggestions"),
+        expSummary.settlements.map((s, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #334155", fontSize: "14px", flexWrap: "wrap" } },
+          React.createElement("span", { style: { color: "#ef4444", fontWeight: "500" } }, s.from),
+          React.createElement("span", { style: { color: "#64748b" } }, "→ pays"),
+          React.createElement("span", { style: { color: "#10b981", fontWeight: "700" } }, fmtAmt(s.amount)),
+          React.createElement("span", { style: { color: "#64748b" } }, "→"),
+          React.createElement("span", { style: { color: "#3b82f6", fontWeight: "500" } }, s.to)
+        ))
+      ),
+      React.createElement("div", { className: "section-card" },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } }, React.createElement("span", { style: { fontWeight: "600" } }, "🎒 Packing Progress"), React.createElement("span", { style: { color: "#a78bfa", fontWeight: "600" } }, packed + "/" + total + " (" + pct + "%)")),
+        React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: pct + "%", background: "linear-gradient(90deg,#3b82f6,#a78bfa)" } }))
       )
-    ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "12px" } },
-      [{ l: "Members", v: (tripData.members || []).length, c: "#3b82f6" }, { l: "Total Spent", v: fmtAmt(expSummary.totalSpent), c: "#10b981" }, { l: "Avg/Person", v: fmtAmt(expSummary.avgPerPerson), c: "#f59e0b" }, { l: "Packed", v: packed + "/" + total + " (" + pct + "%)", c: "#a78bfa" }].map(c => React.createElement("div", { key: c.l, className: "stat-card" }, React.createElement("div", { style: { fontSize: "18px", fontWeight: "bold", color: c.c, wordBreak: "break-word" } }, c.v), React.createElement("div", { style: { fontSize: "12px", color: "#94a3b8", marginTop: "4px" } }, c.l)))
-    ),
-    React.createElement(WeatherWidget, null),
-    pendingDecisions.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #f59e0b33" } },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#f59e0b" } }, "🗳️ Decisions Needing Attention (" + pendingDecisions.length + ")"),
-      pendingDecisions.slice(0, 3).map(d => React.createElement("div", { key: d.id, style: { display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid #334155", padding: "8px 0" } },
-        React.createElement("span", { className: "pill pill-yellow" }, "Proposed"),
-        React.createElement("span", { style: { flex: 1, fontSize: "13px" } }, d.title),
-        React.createElement("button", { onClick: () => setActiveTab("decisions"), style: { padding: "3px 10px", background: "rgba(245,158,11,0.15)", border: "1px solid #f59e0b44", borderRadius: "6px", color: "#f59e0b", fontSize: "12px" } }, "View →")
-      ))
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "📅 Today's Agenda"),
-      sortActivities(todayActs).length === 0 ? React.createElement("div", { style: { color: "#64748b", fontSize: "13px" } }, "No activities scheduled today.") : sortActivities(todayActs).map((a, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #334155", padding: "8px 0" } },
-        React.createElement("span", { style: { color: "#3b82f6", fontSize: "12px", fontFamily: "monospace", minWidth: "48px" } }, a.time),
-        React.createElement("span", { style: { flex: 1 } }, a.title),
-        a.location && React.createElement("span", { style: { fontSize: "11px", color: "#94a3b8" } }, a.location)
-      ))
-    ),
-    upBookings.length > 0 && React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "📋 Upcoming Bookings"),
-      upBookings.map(b => React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #334155", padding: "8px 0" } },
-        React.createElement("span", { style: { fontSize: "18px" } }, TYPE_ICON[b.type] || "📌"),
-        React.createElement("div", { style: { flex: 1 } }, React.createElement("div", { style: { fontWeight: "500" } }, b.title), React.createElement("div", { style: { fontSize: "11px", color: "#94a3b8" } }, b.date + (b.time ? " · " + b.time : ""))),
-        React.createElement("span", { className: "pill " + (b.status === "confirmed" ? "pill-green" : b.status === "pending" ? "pill-yellow" : "pill-red") }, b.status)
-      ))
-    ),
-    myTasks.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #3b82f644" } },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#3b82f6" } }, "✅ My Pending Tasks (" + myTasks.length + ")"),
-      myTasks.slice(0, 4).map(t => React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #334155", padding: "8px 0" } },
-        React.createElement("button", { onClick: () => setTaskStatus(t.id, "done"), style: { background: "none", border: "1px solid #334155", borderRadius: "4px", color: "#64748b", padding: "2px 8px", fontSize: "11px" } }, "Done"),
-        React.createElement("span", { style: { flex: 1, fontSize: "14px" } }, t.title),
-        t.dueDate && React.createElement("span", { style: { fontSize: "11px", color: "#f59e0b" } }, "📅 " + t.dueDate)
-      ))
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "💰 Balance Summary"),
-      (tripData.members || []).filter(m => { const bal = expSummary.balance[m.name] || 0; return Math.abs(bal) > 0.01; }).map(m => { const bal = expSummary.balance[m.name] || 0; return React.createElement("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #334155" } },
-        React.createElement("span", null, m.name, m.isAdmin && React.createElement("span", { style: { fontSize: "10px", color: "#f59e0b", marginLeft: "6px" } }, "(Admin)")),
-        React.createElement("span", { style: { color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8", fontWeight: "600" } }, bal > 0.01 ? "+" + fmtAmt(bal) : bal < -0.01 ? "−" + fmtAmt(Math.abs(bal)) : "Settled ✓")
-      ); }),
-      (tripData.members || []).filter(m => { const bal = expSummary.balance[m.name] || 0; return Math.abs(bal) <= 0.01; }).length === (tripData.members || []).length && 
-        React.createElement("div", { style: { textAlign: "center", padding: "12px", color: "#10b981", fontSize: "13px" } }, "✅ All members are settled up!")
-    ),
-    pendingSettlementsForDashboard.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
-      React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#10b981" } }, "✅ Settlement Suggestions (" + pendingSettlementsForDashboard.length + " pending)"),
-      pendingSettlementsForDashboard.map((s, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #334155", fontSize: "14px", flexWrap: "wrap" } },
-        React.createElement("span", { style: { color: "#ef4444", fontWeight: "500" } }, s.from),
-        React.createElement("span", { style: { color: "#64748b" } }, "→ pays"),
-        React.createElement("span", { style: { color: "#10b981", fontWeight: "700" } }, fmtAmt(s.amount)),
-        React.createElement("span", { style: { color: "#64748b" } }, "→"),
-        React.createElement("span", { style: { color: "#3b82f6", fontWeight: "500" } }, s.to),
-        React.createElement("button", { onClick: () => markSettlementPaid(s), style: { padding: "2px 8px", background: "rgba(59,130,246,0.15)", border: "1px solid #3b82f644", borderRadius: "6px", color: "#60a5fa", fontSize: "11px", marginLeft: "8px" } }, "Mark Paid")
-      ))
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } }, React.createElement("span", { style: { fontWeight: "600" } }, "🎒 Packing Progress"), React.createElement("span", { style: { color: "#a78bfa", fontWeight: "600" } }, packed + "/" + total + " (" + pct + "%)")),
-      React.createElement("div", { className: "progress-bar-wrap" }, React.createElement("div", { className: "progress-bar-fill", style: { width: pct + "%", background: "linear-gradient(90deg,#3b82f6,#a78bfa)" } }))
-    )
-  );
-};
+    );
+  };
   // ========== TODAY TAB 2.0 ==========
   const renderToday = () => {
     const td = today();
@@ -1814,7 +1753,221 @@ const renderDashboard = () => {
       )
     );
   };
+  // ========== ANALYTICS TAB (PREMIUM) ==========
+  const renderAnalytics = () => {
+    const expenses = tripData.expenses || [];
+    const totalSpent = expSummary.totalSpent;
+    const activeDays = Math.max(1, DAYS.filter(d => d.date <= today()).length);
+    const burnRate = totalSpent > 0 ? Math.round(totalSpent / activeDays) : 0;
+    const packingPct = (tripData.packingList||[]).length > 0 ? Math.round(((tripData.packingList||[]).filter(i=>i.checked).length/(tripData.packingList||[]).length)*100) : 0;
+    const tasksPct = (tripData.tasks||[]).length > 0 ? Math.round(((tripData.tasks||[]).filter(t=>t.status==="done").length/(tripData.tasks||[]).length)*100) : 0;
+    // Daily spend
+    const dailySpend = {};
+    DAYS.forEach(d => { dailySpend[d.date] = 0; });
+    expenses.forEach(e => { dailySpend[e.date] = (dailySpend[e.date]||0) + (parseFloat(e.amount)||0); });
+    const maxDaily = Math.max(1, ...Object.values(dailySpend));
+    const busiestDay = Object.entries(dailySpend).sort((a,b)=>b[1]-a[1])[0];
+    // Member spend
+    const memberSpend = {};
+    (tripData.members||[]).forEach(m => { memberSpend[m.name] = expSummary.paidBy[m.name] || 0; });
+    const topSpender = Object.entries(memberSpend).sort((a,b)=>b[1]-a[1])[0];
+    const maxMemberSpend = Math.max(1, ...Object.values(memberSpend));
+    // Ratio (Food vs Transport vs Stay)
+    const bigThree = ["Food","Transport","Stay"];
+    const bigThreeTotal = bigThree.reduce((s,c) => s+(expSummary.byCat[c]||0), 0);
+    // Donut chart data
+    const catColors = Object.values(CAT_COLOR);
+    const nonZeroCats = EXPENSE_CATEGORIES.filter(c => (expSummary.byCat[c]||0) > 0);
+    let cumulativePct = 0;
+    const donutSegments = totalSpent > 0 ? nonZeroCats.map(cat => {
+      const pct = (expSummary.byCat[cat]||0) / totalSpent;
+      const startAngle = cumulativePct * 360;
+      cumulativePct += pct;
+      const endAngle = cumulativePct * 360;
+      const r = 36; const cx = 50; const cy = 50;
+      const toRad = a => (a-90)*Math.PI/180;
+      const x1=cx+r*Math.cos(toRad(startAngle)), y1=cy+r*Math.sin(toRad(startAngle));
+      const x2=cx+r*Math.cos(toRad(endAngle)), y2=cy+r*Math.sin(toRad(endAngle));
+      const large = (endAngle-startAngle) > 180 ? 1 : 0;
+      const d = "M "+cx+" "+cy+" L "+x1+" "+y1+" A "+r+" "+r+" 0 "+large+" 1 "+x2+" "+y2+" Z";
+      return { cat, pct: Math.round(pct*100), d, color: CAT_COLOR[cat]||"#64748b", amt: expSummary.byCat[cat]||0 };
+    }) : [];
 
+    const views = [{id:"spend",label:"💰 Spend"},{id:"progress",label:"✅ Progress"},{id:"trend",label:"📈 Trend"}];
+
+    return React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"14px"},className:"fade-in-up"},
+      React.createElement(SyncBanner, null),
+
+      // View switcher
+      React.createElement("div", {style:{display:"flex",gap:"6px",overflowX:"auto"}},
+        views.map(v => React.createElement("button", {key:v.id,onClick:()=>setAnalyticsView(v.id),style:{padding:"6px 14px",borderRadius:"20px",border:"none",background:analyticsView===v.id?"#3b82f6":"#1e293b",color:analyticsView===v.id?"white":"#94a3b8",fontSize:"12px",fontWeight:"500",whiteSpace:"nowrap"}}, v.label))
+      ),
+
+      // ── KPI Cards ──
+      React.createElement("div", {style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"10px"}},
+        [{l:"Total Spent",v:fmtAmt(totalSpent),c:"#10b981",sub:"all expenses"},{l:"Burn Rate",v:fmtAmt(burnRate)+"/day",c:"#f59e0b",sub:"avg per day"},{l:"Expenses",v:expenses.length,c:"#3b82f6",sub:"transactions"},{l:"Top Spender",v:topSpender?topSpender[0]:"—",c:"#a78bfa",sub:topSpender?fmtAmt(topSpender[1]):""}].map(s =>
+          React.createElement("div", {key:s.l,className:"stat-card",style:{textAlign:"left",padding:"14px"}},
+            React.createElement("div", {style:{fontSize:"11px",color:"#64748b",marginBottom:"4px"}}, s.l),
+            React.createElement("div", {style:{fontSize:"18px",fontWeight:"800",color:s.c}}, s.v),
+            React.createElement("div", {style:{fontSize:"10px",color:"#475569",marginTop:"2px"}}, s.sub)
+          )
+        )
+      ),
+
+      // ── SPEND VIEW ──
+      analyticsView === "spend" && React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"14px"}},
+        // Donut chart + legend
+        React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"14px",fontWeight:"600"}}, "📊 Spending Breakdown"),
+          React.createElement("div", {style:{display:"flex",gap:"20px",alignItems:"center",flexWrap:"wrap"}},
+            // SVG donut
+            React.createElement("div", {style:{flexShrink:0}},
+              React.createElement("svg", {width:"120",height:"120",viewBox:"0 0 100 100",className:"donut-svg"},
+                totalSpent === 0
+                  ? React.createElement("circle", {cx:"50",cy:"50",r:"36",fill:"none",stroke:"#334155",strokeWidth:"18"})
+                  : donutSegments.map((seg,i) => React.createElement("path", {key:i,d:seg.d,fill:seg.color,className:"donut-segment",opacity:"0.9"})),
+                React.createElement("text", {x:"50",y:"46",textAnchor:"middle",fontSize:"8",fill:"#94a3b8"}, "Total"),
+                React.createElement("text", {x:"50",y:"57",textAnchor:"middle",fontSize:"8",fill:"white",fontWeight:"bold"}, totalSpent>0?"₹"+fmt(totalSpent):"₹0")
+              )
+            ),
+            // Legend
+            React.createElement("div", {style:{flex:1,minWidth:"120px"}},
+              donutSegments.map(seg => React.createElement("div", {key:seg.cat,style:{display:"flex",alignItems:"center",gap:"6px",marginBottom:"6px"}},
+                React.createElement("div", {style:{width:"10px",height:"10px",borderRadius:"2px",background:seg.color,flexShrink:0}}),
+                React.createElement("span", {style:{fontSize:"12px",flex:1,color:"#cbd5e1"}}, seg.cat),
+                React.createElement("span", {style:{fontSize:"11px",color:"#64748b",fontWeight:"600"}}, seg.pct+"%")
+              ))
+            )
+          )
+        ),
+        // By member
+        React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"12px",fontWeight:"600"}}, "👥 By Member"),
+          (tripData.members||[]).map(m => {
+            const spent = memberSpend[m.name]||0;
+            const pct = Math.round((spent/maxMemberSpend)*100);
+            const bal = expSummary.balance[m.name]||0;
+            return React.createElement("div", {key:m.name,style:{marginBottom:"10px"}},
+              React.createElement("div", {style:{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}},
+                React.createElement("span", {style:{fontWeight:"600"}}, m.name),
+                React.createElement("span", null,
+                  React.createElement("span", {style:{color:"#94a3b8"}}, fmtAmt(spent)+" paid  "),
+                  React.createElement("span", {style:{color:bal>0.01?"#10b981":bal<-0.01?"#ef4444":"#64748b",fontWeight:"600"}}, bal>0.01?"+"+fmtAmt(bal):bal<-0.01?"-"+fmtAmt(Math.abs(bal)):"settled")
+                )
+              ),
+              React.createElement("div", {className:"progress-bar-wrap",style:{height:"6px"}},
+                React.createElement("div", {className:"progress-bar-fill",style:{width:pct+"%",background:SENDER_COLORS[m.name]||"#3b82f6"}})
+              )
+            );
+          })
+        ),
+        // Big 3 ratio
+        bigThreeTotal > 0 && React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"12px",fontWeight:"600"}}, "📐 Food vs Transport vs Stay"),
+          React.createElement("div", {style:{display:"flex",gap:"4px",height:"32px",borderRadius:"8px",overflow:"hidden",marginBottom:"10px"}},
+            bigThree.map(cat => {
+              const pct = bigThreeTotal > 0 ? Math.round(((expSummary.byCat[cat]||0)/bigThreeTotal)*100) : 0;
+              return pct > 0 ? React.createElement("div", {key:cat,style:{width:pct+"%",background:CAT_COLOR[cat],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"10px",color:"white",fontWeight:"700",transition:"width 0.5s"}}, pct+"%") : null;
+            })
+          ),
+          React.createElement("div", {style:{display:"flex",gap:"12px",flexWrap:"wrap"}},
+            bigThree.map(cat => React.createElement("div", {key:cat,style:{display:"flex",alignItems:"center",gap:"4px"}},
+              React.createElement("div", {style:{width:"8px",height:"8px",borderRadius:"2px",background:CAT_COLOR[cat]}}),
+              React.createElement("span", {style:{fontSize:"11px",color:"#94a3b8"}}, cat+" — "+fmtAmt(expSummary.byCat[cat]||0))
+            ))
+          )
+        )
+      ),
+
+      // ── PROGRESS VIEW ──
+      analyticsView === "progress" && React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"14px"}},
+        React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"14px",fontWeight:"600"}}, "✅ Completion Dashboard"),
+          [["🎒 Packing",packingPct,"#a78bfa"],["✅ Tasks",tasksPct,"#10b981"],["☑️ Check-ins",(tripData.checkins||[]).length>0?Math.round(((tripData.checkins||[]).filter(c=>c.checked).length/(tripData.checkins||[]).length)*100):0,"#3b82f6"]].map(([label,pct,color]) =>
+            React.createElement("div", {key:label,style:{marginBottom:"14px"}},
+              React.createElement("div", {style:{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"6px"}},
+                React.createElement("span", null, label),
+                React.createElement("span", {style:{color:pct===100?"#10b981":pct>50?"#f59e0b":"#94a3b8",fontWeight:"700"}}, pct+"%")
+              ),
+              React.createElement("div", {style:{background:"#0f172a",borderRadius:"10px",height:"10px",overflow:"hidden"}},
+                React.createElement("div", {style:{width:pct+"%",height:"100%",background:color,borderRadius:"10px",transition:"width 0.6s cubic-bezier(0.34,1.56,0.64,1)"}})
+              )
+            )
+          )
+        ),
+        React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"12px",fontWeight:"600"}}, "💰 Budget vs Actual"),
+          EXPENSE_CATEGORIES.map(cat => {
+            const spent = expSummary.byCat[cat]||0;
+            const target = parseFloat((tripData.budgetTargets||{})[cat])||0;
+            if(!target && !spent) return null;
+            const pct = target>0?Math.min(100,Math.round((spent/target)*100)):0;
+            return React.createElement("div", {key:cat,style:{marginBottom:"10px"}},
+              React.createElement("div", {style:{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"3px"}},
+                React.createElement("span", {style:{display:"flex",alignItems:"center",gap:"4px"}},
+                  React.createElement("span", null, CAT_EMOJI[cat]||""),
+                  React.createElement("span", null, cat)
+                ),
+                React.createElement("span", {style:{color:spent>target?"#ef4444":"#94a3b8"}}, fmtAmt(spent)+(target>0?" / "+fmtAmt(target):""))
+              ),
+              target > 0 && React.createElement("div", {className:"progress-bar-wrap",style:{height:"5px"}},
+                React.createElement("div", {className:"progress-bar-fill",style:{width:pct+"%",background:pct>100?"#ef4444":pct>80?"#f59e0b":"#10b981"}})
+              )
+            );
+          }),
+          !EXPENSE_CATEGORIES.some(c=>(expSummary.byCat[c]||0)>0) && React.createElement("div", {style:{color:"#64748b",textAlign:"center",padding:"20px",fontSize:"13px"}}, "No expenses recorded yet")
+        ),
+        // Trip stats grid
+        React.createElement("div", {style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"10px"}},
+          [{l:"Bookings",v:(tripData.bookings||[]).length,icon:"📋"},{l:"Decisions",v:(tripData.decisions||[]).length,icon:"🗳️"},{l:"Notes",v:(tripData.tripNotes||[]).length,icon:"📝"},{l:"Members",v:(tripData.members||[]).length,icon:"👥"}].map(s =>
+            React.createElement("div", {key:s.l,style:{background:"#1e293b",borderRadius:"10px",padding:"12px",display:"flex",alignItems:"center",gap:"10px",border:"1px solid #334155"}},
+              React.createElement("span", {style:{fontSize:"22px"}}, s.icon),
+              React.createElement("div", null,
+                React.createElement("div", {style:{fontWeight:"700",fontSize:"18px",color:"white"}}, s.v),
+                React.createElement("div", {style:{fontSize:"11px",color:"#64748b"}}, s.l)
+              )
+            )
+          )
+        )
+      ),
+
+      // ── TREND VIEW ──
+      analyticsView === "trend" && React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"14px"}},
+        React.createElement("div", {className:"section-card"},
+          React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+            React.createElement("h3", {style:{fontWeight:"600"}}, "📈 Daily Spend Trend"),
+            busiestDay && busiestDay[1]>0 && React.createElement("div", {style:{fontSize:"11px",color:"#94a3b8",textAlign:"right"}},
+              React.createElement("div", null, "Busiest day"),
+              React.createElement("div", {style:{color:"#f59e0b",fontWeight:"600"}}, busiestDay[0].slice(5)+" · "+fmtAmt(busiestDay[1]))
+            )
+          ),
+          React.createElement("div", {style:{display:"flex",alignItems:"flex-end",gap:"3px",height:"100px",padding:"0 2px"}},
+            Object.entries(dailySpend).map(([date,amt]) => {
+              const barH = Math.max(4, (amt/maxDaily)*80);
+              const isToday = date===today();
+              return React.createElement("div", {key:date,style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"3px"}},
+                amt > 0 && React.createElement("span", {style:{fontSize:"8px",color:"#64748b",transform:"rotate(-30deg)",transformOrigin:"bottom"}}, fmtAmt(amt)),
+                React.createElement("div", {style:{width:"100%",height:barH+"px",background:isToday?"linear-gradient(180deg,#f59e0b,#d97706)":"linear-gradient(180deg,#3b82f6,#10b981)",borderRadius:"3px 3px 0 0",minHeight:"4px",transition:"height 0.5s cubic-bezier(0.34,1.56,0.64,1)",cursor:"pointer"},title:date+": "+fmtAmt(amt)}),
+                React.createElement("span", {style:{fontSize:"7px",color:isToday?"#f59e0b":"#64748b",fontWeight:isToday?"700":"normal"}}, date.slice(5))
+              );
+            })
+          )
+        ),
+        // Running total
+        React.createElement("div", {className:"section-card"},
+          React.createElement("h3", {style:{marginBottom:"12px",fontWeight:"600"}}, "📊 Trip Burn Summary"),
+          React.createElement("div", {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}},
+            [{l:"Days Elapsed",v:activeDays+"/10",c:"#3b82f6"},{l:"Avg/Day",v:fmtAmt(burnRate),c:"#f59e0b"},{l:"Projected Total",v:fmtAmt(burnRate*10),c:"#ef4444"},{l:"Remaining Days",v:Math.max(0,10-activeDays),c:"#10b981"}].map(s =>
+              React.createElement("div", {key:s.l,style:{padding:"12px",background:"#0f172a",borderRadius:"8px"}},
+                React.createElement("div", {style:{fontSize:"10px",color:"#64748b",marginBottom:"4px"}}, s.l),
+                React.createElement("div", {style:{fontWeight:"700",color:s.c,fontSize:"16px"}}, s.v)
+              )
+            )
+          )
+        )
+      )
+    );
+  };
   // ========== ITINERARY TAB ==========
   const renderItinerary = () => {
     const dayData = (tripData.itinerary || []).find(d => d.dayId === activeDay);
@@ -2635,96 +2788,7 @@ const renderDashboard = () => {
     }
     return null;
   };
-// ========== ANALYTICS TAB ==========
-const renderAnalytics = () => {
-  const expenses = tripData.expenses || [];
-  const totalSpent = expSummary.totalSpent;
-  const activeDays = Math.max(1, DAYS.filter(d => d.date <= today()).length);
-  const burnRate = totalSpent > 0 ? Math.round(totalSpent / activeDays) : 0;
   
-  const dailySpend = {};
-  DAYS.forEach(d => { dailySpend[d.date] = 0; });
-  expenses.forEach(e => { dailySpend[e.date] = (dailySpend[e.date]||0) + (parseFloat(e.amount)||0); });
-  const maxDaily = Math.max(1, ...Object.values(dailySpend));
-  
-  const packingPct = (tripData.packingList||[]).length > 0 ? Math.round(((tripData.packingList||[]).filter(i=>i.checked).length/(tripData.packingList||[]).length)*100) : 0;
-  const tasksPct = (tripData.tasks||[]).length > 0 ? Math.round(((tripData.tasks||[]).filter(t=>t.status==="done").length/(tripData.tasks||[]).length)*100) : 0;
-  const checkinsPct = (tripData.checkins||[]).length > 0 ? Math.round(((tripData.checkins||[]).filter(c=>c.checked).length/(tripData.checkins||[]).length)*100) : 0;
-  
-  return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "16px" } },
-    React.createElement(SyncBanner, null),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "10px" } },
-      [{ l: "Total Spent", v: fmtAmt(totalSpent), c: "#10b981" }, { l: "Avg/Person", v: fmtAmt(expSummary.avgPerPerson), c: "#3b82f6" }, { l: "Expenses", v: expenses.length, c: "#f59e0b" }, { l: "Burn Rate", v: totalSpent > 0 ? fmtAmt(burnRate) + "/day" : "—", c: "#a78bfa" }].map(s => 
-        React.createElement("div", { key: s.l, className: "stat-card" }, 
-          React.createElement("div", { style: { fontSize: "18px", fontWeight: "bold", color: s.c } }, s.v),
-          React.createElement("div", { style: { fontSize: "11px", color: "#94a3b8", marginTop: "4px" } }, s.l)
-        )
-      )
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { marginBottom: "12px" } }, "📊 Spending by Category"),
-      EXPENSE_CATEGORIES.map(cat => { 
-        const spent = expSummary.byCat[cat] || 0; 
-        const pct = totalSpent > 0 ? Math.round((spent / totalSpent) * 100) : 0; 
-        if (!spent) return null; 
-        return React.createElement("div", { key: cat, style: { marginBottom: "8px" } },
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "3px" } }, 
-            React.createElement("span", null, React.createElement("span", { className: "pill " + (CAT_PILL[cat] || "pill-gray") }, cat)), 
-            React.createElement("span", { style: { color: "#94a3b8" } }, fmtAmt(spent) + " (" + pct + "%)")
-          ),
-          React.createElement("div", { className: "progress-bar-wrap", style: { height: "6px" } }, 
-            React.createElement("div", { className: "progress-bar-fill", style: { width: pct + "%", background: "#3b82f6" } })
-          )
-        );
-      })
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { marginBottom: "12px" } }, "📈 Daily Spend Trend"),
-      React.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: "3px", height: "80px", padding: "0 4px" } },
-        Object.entries(dailySpend).map(([date, amt]) => 
-          React.createElement("div", { key: date, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" } },
-            React.createElement("span", { style: { fontSize: "9px", color: "#64748b" } }, amt > 0 ? fmtAmt(amt) : ""),
-            React.createElement("div", { style: { width: "100%", maxWidth: "30px", height: Math.max(4, (amt / maxDaily) * 60) + "px", background: amt > 0 ? "linear-gradient(180deg,#3b82f6,#10b981)" : "#1e293b", borderRadius: "3px 3px 0 0", transition: "height 0.4s ease", minHeight: "4px" } }),
-            React.createElement("span", { style: { fontSize: "8px", color: "#64748b" } }, date.slice(5))
-          )
-        )
-      )
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { marginBottom: "12px" } }, "✅ Completion Rates"),
-      [["🎒 Packing", packingPct], ["✅ Tasks", tasksPct], ["☑️ Check-ins", checkinsPct]].map(([label, pct]) => 
-        React.createElement("div", { key: label, style: { marginBottom: "8px" } },
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" } }, 
-            React.createElement("span", null, label), 
-            React.createElement("span", { style: { color: "#94a3b8" } }, pct + "%")
-          ),
-          React.createElement("div", { className: "progress-bar-wrap", style: { height: "6px" } }, 
-            React.createElement("div", { className: "progress-bar-fill", style: { width: pct + "%", background: pct === 100 ? "#10b981" : pct > 50 ? "#f59e0b" : "#3b82f6" } })
-          )
-        )
-      )
-    ),
-    React.createElement("div", { className: "section-card" },
-      React.createElement("h3", { style: { marginBottom: "12px" } }, "🎯 Budget vs Actual"),
-      EXPENSE_CATEGORIES.map(cat => { 
-        const spent = expSummary.byCat[cat] || 0; 
-        const target = parseFloat((tripData.budgetTargets || {})[cat]) || 0; 
-        if (!target && !spent) return null; 
-        const pct = target > 0 ? Math.min(100, Math.round((spent / target) * 100)) : 0; 
-        return React.createElement("div", { key: cat, style: { marginBottom: "6px" } },
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "2px" } }, 
-            React.createElement("span", null, cat), 
-            React.createElement("span", { style: { color: spent > target ? "#ef4444" : "#94a3b8" } }, fmtAmt(spent) + (target > 0 ? " / " + fmtAmt(target) : ""))
-          ),
-          target > 0 && React.createElement("div", { className: "progress-bar-wrap", style: { height: "5px" } }, 
-            React.createElement("div", { className: "progress-bar-fill", style: { width: pct + "%", background: pct > 100 ? "#ef4444" : pct > 80 ? "#f59e0b" : "#10b981" } })
-          )
-        );
-      })
-    )
-  );
-};  
-
   // ========== TABS ==========
   const TABS = [
     { id: "dashboard", label: "🏠 Home", render: renderDashboard },
