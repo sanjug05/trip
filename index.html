@@ -81,7 +81,34 @@ mark{background:#f59e0b33;color:#f59e0b;border-radius:2px;padding:0 2px}
 .command-palette-item{padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;font-size:14px;color:#cbd5e1}
 .command-palette-item:hover,.command-palette-item.selected{background:#0f172a}
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:600;padding:16px}
-@media(max-width:600px){button,.clickable{min-height:44px;min-width:44px}input,select{font-size:16px!important}}
+/* ── All-Tabs Drawer (mobile) ── */
+.all-tabs-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;display:flex;align-items:flex-end;justify-content:center}
+.all-tabs-drawer{background:#1e293b;border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:12px 16px max(20px,env(safe-area-inset-bottom));max-height:70vh;overflow-y:auto}
+.all-tabs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.all-tabs-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;background:#0f172a;border-radius:10px;border:1px solid #334155;cursor:pointer;transition:all 0.15s}
+.all-tabs-item:active{transform:scale(0.95);background:#334155}
+.all-tabs-item.active-tab{background:rgba(59,130,246,0.15);border-color:#3b82f644}
+.all-tabs-item .t-icon{font-size:20px}
+.all-tabs-item .t-label{font-size:10px;color:#94a3b8;text-align:center;font-weight:500}
+.all-tabs-item.active-tab .t-label{color:#60a5fa}
+/* Main content bottom padding for bottom nav */
+@media (max-width:768px){
+  .main-content-area{padding-bottom:calc(80px + env(safe-area-inset-bottom) + 10px)!important}
+  .fab{bottom:calc(80px + env(safe-area-inset-bottom) + 8px)!important}
+  .notif-center{bottom:calc(80px + env(safe-area-inset-bottom))!important}
+  .all-tabs-drawer-overlay{z-index:151}
+}
+/* Pending badge on nav item */
+.nav-badge{position:absolute;top:-2px;right:-4px;background:#ef4444;color:white;border-radius:50%;width:14px;height:14px;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.mobile-nav-item{position:relative}
+/* Touch-friendly safe scroll */
+@media (max-width:768px){
+  input,select,textarea{font-size:16px!important}
+  .settlement-row{flex-wrap:wrap;gap:6px}
+  .section-card{padding:12px}
+  .stat-card{padding:12px}
+  .today-action-grid{grid-template-columns:repeat(2,1fr)}
+}
 
 /* ── Settlement System ── */
 .settlement-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;margin-bottom:6px;background:#0f172a;border:1px solid #1e293b;transition:all 0.2s}
@@ -577,6 +604,7 @@ const App = () => {
   const [restorePreview, setRestorePreview] = React.useState(null);
   const [snapshotMsg, setSnapshotMsg] = React.useState("");
   const [todayQuickAmt, setTodayQuickAmt] = React.useState("");
+  const [showAllTabsDrawer, setShowAllTabsDrawer] = React.useState(false);
 
   const chatEndRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
@@ -771,7 +799,7 @@ const App = () => {
   }, [tripData?.destinationCity]);
   
   React.useEffect(() => {
-    const h = () => { setShowReminders(false); setShowSearch(false); setShowFAB(false); setShowNotifCenter(false); };
+    const h = () => { setShowReminders(false); setShowSearch(false); setShowFAB(false); setShowNotifCenter(false); setShowAllTabsDrawer(false); };
     document.addEventListener("click", h);
     return () => document.removeEventListener("click", h);
   }, []);
@@ -1065,7 +1093,7 @@ const App = () => {
       html = "<div style='" + st + "'><h1>🎒 Packing Checklist</h1>" + body + "</div>";
     } else {
       const expRows = (tripData.expenses || []).map(e => "<div style='margin:8px 0;padding:8px;background:#f9f9f9;border-radius:4px;border-left:3px solid #3b82f6'><b>" + e.description + "</b> — ₹" + fmt(e.amount) + "<br><small>" + e.date + " · " + (e.category || "Misc") + " · Paid by " + e.paidBy + "</small></div>").join("");
-      const setRows = expSummary.settlements.map(s => "<div style='margin:6px 0;padding:8px;background:#fff3cd;border-radius:4px'><b>" + s.from + "</b> → ₹" + fmt(s.amount) + " → <b>" + s.to + "</b></div>").join("");
+      const setRows = pendingSettlements.map(s => "<div style='margin:6px 0;padding:8px;background:#fff3cd;border-radius:4px'><b>" + s.from + "</b> → ₹" + fmt(s.amount) + " → <b>" + s.to + "</b></div>").join("") + (paidSettlements.length > 0 ? "<p style='color:#10b981;margin-top:8px'>✅ " + paidSettlements.length + " settlement(s) already paid.</p>" : "");
       html = "<div style='" + st + "'><h1>💰 Expense Report</h1><p>Total: ₹" + fmt(expSummary.totalSpent) + " · Avg/Person: ₹" + fmt(expSummary.avgPerPerson) + "</p><h2 style='" + h2 + "'>Expenses</h2>" + expRows + "<h2 style='" + h2 + "'>Settlement</h2>" + (setRows || "<p>All settled!</p>") + "</div>";
     }
     const el = document.createElement("div");
@@ -1108,7 +1136,7 @@ const App = () => {
     const top5 = (tripData.expenses || []).slice().sort((a, b) => b.amount - a.amount).slice(0, 5);
     const byType = {};
     (tripData.bookings || []).forEach(b => { byType[b.type] = (byType[b.type] || 0) + 1; });
-    return { totalSpent: expSummary.totalSpent, avgPerPerson: expSummary.avgPerPerson, byCat: expSummary.byCat, paidBy: expSummary.paidBy, balance: expSummary.balance, settlements: expSummary.settlements, packedCount, totalItems: pl.length, tasksDone, totalTasks: tasks.length, ciDone, totalCI: ci.length, top5, byType, decisions: tripData.decisions || [], notes: tripData.tripNotes || [], members: tripData.members || [], generatedAt: new Date().toISOString() };
+    return { totalSpent: expSummary.totalSpent, avgPerPerson: expSummary.avgPerPerson, byCat: expSummary.byCat, paidBy: expSummary.paidBy, balance: expSummary.balance, settlements: pendingSettlements, packedCount, totalItems: pl.length, tasksDone, totalTasks: tasks.length, ciDone, totalCI: ci.length, top5, byType, decisions: tripData.decisions || [], notes: tripData.tripNotes || [], members: tripData.members || [], generatedAt: new Date().toISOString() };
   };
   
   const saveTripMemory = (report) => {
@@ -1209,7 +1237,7 @@ const App = () => {
     const total = fmtAmt(expSummary.totalSpent);
     const packed = (tripData.packingList || []).filter(i => i.checked).length;
     const totalItems = (tripData.packingList || []).length;
-    const settlements = (expSummary.settlements || []).map(s => "  " + s.from + " → " + fmtAmt(s.amount) + " → " + s.to).join("\n") || "  All settled ✅";
+    const settlements = pendingSettlements.length > 0 ? pendingSettlements.map(s => "  " + s.from + " → " + fmtAmt(s.amount) + " → " + s.to).join("\n") : "  All settled ✅";
     const text = "✈️ *Trip Planner Summary*\n👥 Members: " + members + "\n💰 Total Spent: " + total + "\n🎒 Packed: " + packed + "/" + totalItems + "\n📋 Bookings: " + (tripData.bookings || []).length + "\n✅ Tasks Done: " + (tripData.tasks || []).filter(t => t.status === "done").length + "/" + (tripData.tasks || []).length + "\n\n💳 *Settlements:*\n" + settlements + "\n\n_Generated by Trip Planner PRO_";
     window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
   };
@@ -1220,25 +1248,39 @@ const App = () => {
   const closeConfirm = () => setConfirmModal(null);
 
   // ── Settlement Management (Feature 1) ──
-  const getSettlements = React.useMemo(() => {
+  // ── Settlement Management — Single Source of Truth ──
+  const allSettlements = React.useMemo(() => {
     const paid = tripData?.settledPayments || {};
     return (expSummary.settlements || []).map(s => {
-      const key = s.from + "|" + s.to;
+      // Key includes rounded amount — prevents stale paid flags when amounts change
+      const key = s.from + "|" + s.to + "|" + Math.round(s.amount);
       const paidEntry = paid[key];
-      return { ...s, key, isPaid: !!paidEntry, paidAt: paidEntry?.at, paidNote: paidEntry?.note, paidAmount: paidEntry?.amount };
+      return { ...s, key, isPaid: !!paidEntry, paidAt: paidEntry?.at, paidNote: paidEntry?.note };
     });
   }, [expSummary.settlements, tripData?.settledPayments]);
 
+  const pendingSettlements = React.useMemo(() =>
+    allSettlements.filter(s => !s.isPaid), [allSettlements]);
+
+  const paidSettlements = React.useMemo(() =>
+    allSettlements.filter(s => s.isPaid), [allSettlements]);
+
+  // Legacy alias — kept so any old refs still work during refactor
+  const getSettlements = allSettlements;
+
   const markSettlementPaid = (s, note="") => {
     const paid = { ...(tripData?.settledPayments || {}) };
-    paid[s.key] = { at: new Date().toISOString(), note, amount: s.amount, from: s.from, to: s.to };
+    // Use the stable key that includes amount (matches allSettlements key)
+    const stableKey = s.from + "|" + s.to + "|" + Math.round(s.amount);
+    paid[stableKey] = { at: new Date().toISOString(), note, amount: s.amount, from: s.from, to: s.to };
     updateTripData({ ...tripData, settledPayments: paid }, "marked settlement paid", "settlement", s.from + " paid " + fmtAmt(s.amount) + " to " + s.to);
     sendChat(s.from + " settled ₹" + fmt(s.amount) + " to " + s.to + (note ? " — " + note : ""), "system");
   };
 
   const markSettlementUnpaid = (s) => {
     const paid = { ...(tripData?.settledPayments || {}) };
-    delete paid[s.key];
+    const stableKey = s.from + "|" + s.to + "|" + Math.round(s.amount);
+    delete paid[stableKey];
     updateTripData({ ...tripData, settledPayments: paid }, "marked settlement pending", "settlement", s.from + " → " + s.to);
   };
 
@@ -1268,11 +1310,11 @@ const App = () => {
     (tripData?.tasks||[]).filter(t=>t.dueDate&&t.dueDate<=tom&&t.status!=="done").forEach(t=>
       items.push({id:"t"+t.id,type:"task",title:t.title,detail:"Due: "+t.dueDate,urgent:t.dueDate<td})
     );
-    if ((expSummary.settlements||[]).length > 0)
-      items.push({id:"settle",type:"expense",title:"Pending Settlements",detail:(expSummary.settlements||[]).length+" payment(s) due",urgent:false});
+    if (pendingSettlements.length > 0)
+      items.push({id:"settle",type:"expense",title:"Pending Settlements",detail:pendingSettlements.length+" payment(s) due",urgent:false});
     (tripData?.packingList||[]).filter(p=>!p.checked).length > 3 && items.push({id:"pack",type:"packing",title:"Packing Incomplete",detail:(tripData?.packingList||[]).filter(p=>!p.checked).length+" items unpacked",urgent:false});
     return items;
-  }, [tripData, expSummary]);
+  }, [tripData, pendingSettlements]);
 
   // ── Advanced Snapshot (Feature 3) ──
   const createSnapshot = () => {
@@ -1327,9 +1369,9 @@ const App = () => {
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     (tripData?.bookings || []).forEach(b => { if (b.date >= td && b.date <= tomorrow && b.status !== "cancelled") list.push({ icon: "📅", msg: "Booking: " + b.title + " on " + b.date }); });
     (tripData?.tasks || []).filter(t => t.dueDate === td && t.status !== "done").forEach(t => list.push({ icon: "⏰", msg: "Task due today: " + t.title }));
-    if (expSummary.settlements?.length > 0) {
+    if (pendingSettlements.length > 0) {
       const old2 = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
-      if ((tripData?.expenses || []).some(e => e.date <= old2)) list.push({ icon: "💰", msg: expSummary.settlements.length + " pending settlement(s)" });
+      if ((tripData?.expenses || []).some(e => e.date <= old2)) list.push({ icon: "💰", msg: pendingSettlements.length + " pending settlement(s)" });
     }
     (tripData?.polls || []).forEach(p => { const tv = Object.values(p.votes || {}).reduce((a, b) => a + b, 0); if (tv === 0) list.push({ icon: "📊", msg: "Poll needs votes: \"" + (p.question || "").slice(0, 30) + "…\"" }); });
     return list;
@@ -1422,7 +1464,7 @@ const App = () => {
     const alerts = [];
     (tripData?.bookings || []).filter(b => (b.date === td || b.date === tom) && b.status !== "cancelled").forEach(b => alerts.push({ icon: "📅", msg: (b.date === td ? "Today" : "Tomorrow") + ": " + b.title, go: () => setActiveTab("bookings"), btn: "View" }));
     (tripData?.tasks || []).filter(t => t.dueDate && t.dueDate <= td && t.status !== "done").forEach(t => alerts.push({ icon: t.dueDate < td ? "🚨" : "⏰", msg: "Task " + (t.dueDate < td ? "overdue" : "due today") + ": " + t.title + " (" + t.assignedTo + ")", go: () => setActiveTab("tasks"), btn: "View" }));
-    if (expSummary.settlements?.length > 0) alerts.push({ icon: "💰", msg: expSummary.settlements.length + " unsettled expense(s)", go: () => setActiveTab("expenses"), btn: "Settle" });
+    if (pendingSettlements.length > 0) alerts.push({ icon: "💰", msg: pendingSettlements.length + " unsettled expense(s)", go: () => setActiveTab("expenses"), btn: "Settle" });
     (tripData?.polls || []).forEach(p => { const tv = Object.values(p.votes || {}).reduce((a, b) => a + b, 0); if (tv === 0) alerts.push({ icon: "📊", msg: "Poll: \"" + (p.question || "").slice(0, 40) + "\"", go: () => setActiveTab("polls"), btn: "Vote" }); });
     (tripData?.checkins || []).filter(c => c.date === td && !c.checked).forEach(c => alerts.push({ icon: "☑️", msg: "Check-in today: " + c.item + " (" + c.assignedTo + ")", go: () => setActiveTab("checkins"), btn: "Mark" }));
     return React.createElement("div", { style: { background: "#1e293b", borderRadius: "12px", padding: "16px", border: alerts.length > 0 ? "1px solid #ef444433" : "1px solid #10b98133" } },
@@ -1583,9 +1625,9 @@ const App = () => {
           React.createElement("span", { style: { color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8", fontWeight: "600" } }, bal > 0.01 ? "+" + fmtAmt(bal) : bal < -0.01 ? "−" + fmtAmt(Math.abs(bal)) : "Settled ✓")
         ); })
       ),
-      expSummary.settlements.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
+      pendingSettlements.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
         React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px", color: "#10b981" } }, "✅ Settlement Suggestions"),
-        expSummary.settlements.map((s, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #334155", fontSize: "14px", flexWrap: "wrap" } },
+        pendingSettlements.map((s, i) => React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid #334155", fontSize: "14px", flexWrap: "wrap" } },
           React.createElement("span", { style: { color: "#ef4444", fontWeight: "500" } }, s.from),
           React.createElement("span", { style: { color: "#64748b" } }, "→ pays"),
           React.createElement("span", { style: { color: "#10b981", fontWeight: "700" } }, fmtAmt(s.amount)),
@@ -1613,7 +1655,7 @@ const App = () => {
     const budgetColor = budgetPct > 90 ? "#ef4444" : budgetPct > 70 ? "#f59e0b" : "#10b981";
     const myTasks = (tripData.tasks || []).filter(t => t.assignedTo === authUser?.username && t.status !== "done");
     const li = tripData.localInfo || {};
-    const pendingSettles = (getSettlements||[]).filter(s=>!s.isPaid);
+    // pendingSettlements is the canonical derived list — no re-filter needed
     const pendingNotifs = getUpcomingNotifs.filter(n=>n.urgent);
 
     return React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"14px"},className:"fade-in-up"},
@@ -1737,12 +1779,12 @@ const App = () => {
       React.createElement(WeatherWidget, null),
 
       // ── Pending Settlements Quick View ──
-      pendingSettles.length > 0 && React.createElement("div", {className:"section-card",style:{border:"1px solid #10b98133"}},
+      pendingSettlements.length > 0 && React.createElement("div", {className:"section-card",style:{border:"1px solid #10b98133"}},
         React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
           React.createElement("h3", {style:{fontWeight:"600",color:"#10b981"}}, "💸 Pending Settlements"),
           React.createElement("button", {onClick:()=>setActiveTab("expenses"),style:{fontSize:"12px",color:"#60a5fa",background:"none",border:"none",cursor:"pointer"}}, "View All →")
         ),
-        pendingSettles.slice(0,3).map((s,i) => React.createElement("div", {key:i,className:"settlement-row"},
+        pendingSettlements.slice(0,3).map((s,i) => React.createElement("div", {key:i,className:"settlement-row"},
           React.createElement("span", {style:{fontWeight:"600",color:"#ef4444",fontSize:"13px"}}, s.from),
           React.createElement("span", {style:{color:"#64748b",fontSize:"12px"}}, "→"),
           React.createElement("span", {className:"settle-amount",style:{color:"#10b981",fontWeight:"700",fontSize:"13px"}}, fmtAmt(s.amount)),
@@ -2148,7 +2190,7 @@ const App = () => {
         React.createElement("h3", { style: { fontWeight: "600", marginBottom: "12px" } }, "⚖️ Balances"),
         (tripData.members || []).map(m => { const bal = expSummary.balance[m.name] || 0; return React.createElement("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #334155" } }, React.createElement("span", null, m.name), React.createElement("span", { style: { color: bal > 0.01 ? "#10b981" : bal < -0.01 ? "#ef4444" : "#94a3b8", fontWeight: "600" } }, bal > 0.01 ? "gets " + fmtAmt(bal) : bal < -0.01 ? "owes " + fmtAmt(Math.abs(bal)) : "Settled ✓")); })
       ),
-      expSummary.settlements.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
+      allSettlements.length > 0 && React.createElement("div", { className: "section-card", style: { border: "1px solid #10b98133" } },
         // Filter bar
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" } },
           React.createElement("h3", { style: { fontWeight: "700", color: "#10b981" } }, "💸 Settlement Manager"),
@@ -2161,18 +2203,17 @@ const App = () => {
         // Stats row
         React.createElement("div", { style: { display: "flex", gap: "10px", marginBottom: "14px", flexWrap: "wrap" } },
           React.createElement("div", { className: "metric-pill", style: { background: "rgba(239,68,68,0.1)", color: "#fca5a5" } },
-            "⏳ ", (getSettlements||[]).filter(s => !s.isPaid).length, " pending"
+            "⏳ ", pendingSettlements.length, " pending"
           ),
           React.createElement("div", { className: "metric-pill", style: { background: "rgba(16,185,129,0.1)", color: "#10b981" } },
-            "✅ ", (getSettlements||[]).filter(s => s.isPaid).length, " settled"
+            "✅ ", paidSettlements.length, " settled"
           ),
           React.createElement("div", { className: "metric-pill", style: { background: "rgba(59,130,246,0.1)", color: "#60a5fa" } },
-            "💰 Total: ", fmtAmt((getSettlements||[]).reduce((s,x)=>s+x.amount,0))
+            "💰 Total: ", fmtAmt(pendingSettlements.reduce((s,x)=>s+x.amount,0))
           )
         ),
         // Settlement rows
-        (getSettlements||[])
-          .filter(s => settlementFilter === "all" ? true : settlementFilter === "paid" ? s.isPaid : !s.isPaid)
+        (settlementFilter === "all" ? allSettlements : settlementFilter === "paid" ? paidSettlements : pendingSettlements)
           .map((s, i) => React.createElement("div", { key: i, className: "settlement-row " + (s.isPaid ? "paid" : "") },
             React.createElement("div", { style: { flex: 1 } },
               React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginBottom: s.isPaid ? "4px" : "0" } },
@@ -2197,11 +2238,11 @@ const App = () => {
                 } }, "Mark Paid ✓")
           )),
         // Settlement history archive
-        Object.keys(tripData?.settledPayments || {}).length > 0 && React.createElement("div", { style: { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #1e293b" } },
-          React.createElement("div", { style: { fontSize: "11px", color: "#475569", marginBottom: "6px", fontWeight: "600" } }, "SETTLEMENT HISTORY"),
-          Object.values(tripData.settledPayments || {}).map((p, i) => React.createElement("div", { key: i, style: { fontSize: "11px", color: "#475569", padding: "4px 0", borderBottom: "1px solid #0f172a", display: "flex", justifyContent: "space-between" } },
-            React.createElement("span", null, p.from, " → ", fmtAmt(p.amount), " → ", p.to, p.note ? " (" + p.note + ")" : ""),
-            React.createElement("span", null, new Date(p.at).toLocaleDateString("en-IN"))
+        paidSettlements.length > 0 && React.createElement("div", { style: { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #1e293b" } },
+          React.createElement("div", { style: { fontSize: "11px", color: "#475569", marginBottom: "6px", fontWeight: "600" } }, "PAID SETTLEMENTS HISTORY"),
+          paidSettlements.map((s, i) => React.createElement("div", { key: i, style: { fontSize: "11px", color: "#475569", padding: "4px 0", borderBottom: "1px solid #0f172a", display: "flex", justifyContent: "space-between" } },
+            React.createElement("span", null, s.from, " → ", fmtAmt(s.amount), " → ", s.to, s.paidNote ? " (" + s.paidNote + ")" : ""),
+            React.createElement("span", null, s.paidAt ? new Date(s.paidAt).toLocaleDateString("en-IN") : "")
           ))
         )
       ),
@@ -2859,7 +2900,7 @@ const App = () => {
         TABS.map(tab => React.createElement("button", { key: tab.id, onClick: () => setActiveTab(tab.id), style: { padding: "5px 9px", borderRadius: "8px", fontSize: "11px", whiteSpace: "nowrap", border: "none", background: activeTab === tab.id ? "#3b82f6" : "transparent", color: activeTab === tab.id ? "white" : "#94a3b8", fontWeight: activeTab === tab.id ? "600" : "normal" } }, tab.label))
       )
     ),
-    React.createElement("div", { style: { padding: "20px 16px 90px", maxWidth: "1200px", margin: "0 auto" } },
+    React.createElement("div", { className: "main-content-area", style: { padding: "20px 16px 90px", maxWidth: "1200px", margin: "0 auto" } },
       React.createElement("div", { className: "quick-expense-bar", style: { marginBottom: "12px" } },
         React.createElement("input", { className: "quick-expense-input", type: "text", placeholder: "Quick add: \"500 food by Sanjug\"", value: quickExpenseInput, onChange: e => setQuickExpenseInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") handleQuickExpense(); } }),
         React.createElement("button", { className: "quick-expense-btn", onClick: handleQuickExpense }, "Add"),
@@ -2873,10 +2914,68 @@ const App = () => {
       TABS.find(t => t.id === activeTab)?.render()
     ),
     React.createElement("div", { className: "mobile-bottom-nav" },
-      [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "today", icon: "📍", label: "Today" }, { id: "expenses", icon: "💰", label: "Expenses" }, { id: "tasks", icon: "✅", label: "Tasks" }, { id: "analytics", icon: "📊", label: "More" }].map(item => React.createElement("button", { key: item.id, className: "mobile-nav-item" + (activeTab === item.id ? " active" : ""), onClick: () => setActiveTab(item.id) },
-        React.createElement("span", { className: "mobile-nav-icon" }, item.icon),
-        React.createElement("span", null, item.label)
-      ))
+      // 5 primary nav items + All-tabs "More" button
+      [
+        { id: "dashboard", icon: "🏠", label: "Home" },
+        { id: "today",     icon: "📍", label: "Today" },
+        { id: "expenses",  icon: "💰", label: "Expenses" },
+        { id: "tasks",     icon: "✅", label: "Tasks" },
+        { id: "__more__",  icon: "⋯",  label: "More" },
+      ].map(item =>
+        React.createElement("button", {
+          key: item.id,
+          className: "mobile-nav-item" + (item.id !== "__more__" && activeTab === item.id ? " active" : "") + (item.id === "__more__" && !["dashboard","today","expenses","tasks"].includes(activeTab) ? " active" : ""),
+          onClick: () => {
+            if (item.id === "__more__") { setShowAllTabsDrawer(v => !v); }
+            else { setActiveTab(item.id); setShowAllTabsDrawer(false); }
+          }
+        },
+          React.createElement("span", { className: "mobile-nav-icon", style: item.id === "__more__" ? { fontSize: "22px", letterSpacing: "1px" } : {} }, item.icon),
+          React.createElement("span", null, item.label),
+          // Pending badge on Expenses tab
+          item.id === "expenses" && pendingSettlements.length > 0 &&
+            React.createElement("div", { className: "nav-badge" }, pendingSettlements.length > 9 ? "9+" : pendingSettlements.length)
+        )
+      )
+    ),
+
+    // ── All-Tabs Drawer (mobile) ──
+    showAllTabsDrawer && React.createElement("div", { className: "all-tabs-drawer-overlay", onClick: () => setShowAllTabsDrawer(false) },
+      React.createElement("div", { className: "all-tabs-drawer", onClick: e => e.stopPropagation() },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" } },
+          React.createElement("span", { style: { fontWeight: "700", fontSize: "15px", color: "#e2e8f0" } }, "All Sections"),
+          React.createElement("button", { onClick: () => setShowAllTabsDrawer(false), style: { background: "none", border: "none", color: "#64748b", fontSize: "22px", cursor: "pointer", padding: "4px 8px" } }, "×")
+        ),
+        React.createElement("div", { className: "all-tabs-grid" },
+          [
+            { id: "itinerary",  icon: "🗓️",  label: "Itinerary"  },
+            { id: "bookings",   icon: "📋",  label: "Bookings"   },
+            { id: "packing",    icon: "🎒",  label: "Packing"    },
+            { id: "documents",  icon: "🛂",  label: "Docs"       },
+            { id: "polls",      icon: "📊",  label: "Polls"      },
+            { id: "decisions",  icon: "🗳️",  label: "Decisions"  },
+            { id: "notes",      icon: "📝",  label: "Notes"      },
+            { id: "links",      icon: "🔗",  label: "Links"      },
+            { id: "checkins",   icon: "☑️",  label: "Check-ins"  },
+            { id: "chat",       icon: "💬",  label: "Chat"       },
+            { id: "analytics",  icon: "📈",  label: "Analytics"  },
+            { id: "members",    icon: "👥",  label: "Members"    },
+            { id: "settings",   icon: "⚙️",  label: "Settings"   },
+          ].map(item =>
+            React.createElement("div", {
+              key: item.id,
+              className: "all-tabs-item" + (activeTab === item.id ? " active-tab" : ""),
+              onClick: () => { setActiveTab(item.id); setShowAllTabsDrawer(false); }
+            },
+              React.createElement("span", { className: "t-icon" }, item.icon),
+              React.createElement("span", { className: "t-label" }, item.label),
+              // Unread badge for chat
+              item.id === "chat" && unreadChat > 0 &&
+                React.createElement("span", { style: { fontSize: "9px", background: "#ef4444", color: "white", borderRadius: "10px", padding: "1px 5px", marginTop: "2px" } }, unreadChat)
+            )
+          )
+        )
+      )
     ),
     showInstallBanner && deferredPrompt && React.createElement("div", { className: "install-banner" },
       React.createElement("span", { style: { fontSize: "24px", flexShrink: 0 } }, "📱"),
