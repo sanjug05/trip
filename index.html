@@ -81,7 +81,14 @@ mark{background:#f59e0b33;color:#f59e0b;border-radius:2px;padding:0 2px}
 .command-palette-item{padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:12px;font-size:14px;color:#cbd5e1}
 .command-palette-item:hover,.command-palette-item.selected{background:#0f172a}
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:600;padding:16px}
-/* ── All-Tabs Drawer (mobile) ── */
+/* ── iOS PWA Install Banner ── */
+.ios-install-banner{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:12px;right:12px;background:linear-gradient(135deg,#1e3a5f,#1e293b);border:1px solid #3b82f644;border-radius:14px;padding:14px 16px;z-index:200;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:fadeInUp 0.4s ease}
+.ios-install-banner .ios-icon{font-size:28px;flex-shrink:0}
+.ios-install-banner .ios-text{flex:1;min-width:0}
+.ios-install-banner .ios-text b{display:block;font-size:13px;color:#e2e8f0;font-weight:700;margin-bottom:2px}
+.ios-install-banner .ios-text span{font-size:11px;color:#94a3b8;line-height:1.4;display:block}
+.ios-install-banner .ios-dismiss{background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0}
+.ios-install-arrow{display:inline-block;background:rgba(59,130,246,0.15);border:1px solid #3b82f633;border-radius:6px;padding:1px 6px;font-size:11px;color:#60a5fa;margin-left:2px}
 .all-tabs-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;display:flex;align-items:flex-end;justify-content:center}
 .all-tabs-drawer{background:#1e293b;border-radius:20px 20px 0 0;width:100%;max-width:500px;padding:12px 16px max(20px,env(safe-area-inset-bottom));max-height:70vh;overflow-y:auto}
 .all-tabs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
@@ -248,6 +255,11 @@ const db = firebase.firestore();
     window.__deferredPrompt = e;
     window.dispatchEvent(new CustomEvent("pwa-install-ready", { detail: e }));
   });
+
+  // iOS Safari: detect if running in browser (not standalone) and flag for banner
+  const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isInStandaloneMode = window.navigator.standalone === true;
+  window.__showIosBanner = isIos && !isInStandaloneMode && !localStorage.getItem("ios-banner-dismissed");
 })();
 
 // ========== CONSTANTS ==========
@@ -605,6 +617,7 @@ const App = () => {
   const [snapshotMsg, setSnapshotMsg] = React.useState("");
   const [todayQuickAmt, setTodayQuickAmt] = React.useState("");
   const [showAllTabsDrawer, setShowAllTabsDrawer] = React.useState(false);
+  const [showIosBanner, setShowIosBanner] = React.useState(() => !!window.__showIosBanner);
 
   const chatEndRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
@@ -2913,7 +2926,7 @@ const App = () => {
       ),
       TABS.find(t => t.id === activeTab)?.render()
     ),
-    React.createElement("div", { className: "mobile-bottom-nav" },
+    React.createElement("div", { className: "mobile-bottom-nav", onClick: e => e.stopPropagation() },
       // 5 primary nav items + All-tabs "More" button
       [
         { id: "dashboard", icon: "🏠", label: "Home" },
@@ -2925,7 +2938,8 @@ const App = () => {
         React.createElement("button", {
           key: item.id,
           className: "mobile-nav-item" + (item.id !== "__more__" && activeTab === item.id ? " active" : "") + (item.id === "__more__" && !["dashboard","today","expenses","tasks"].includes(activeTab) ? " active" : ""),
-          onClick: () => {
+          onClick: (e) => {
+            e.stopPropagation();
             if (item.id === "__more__") { setShowAllTabsDrawer(v => !v); }
             else { setActiveTab(item.id); setShowAllTabsDrawer(false); }
           }
@@ -2937,6 +2951,23 @@ const App = () => {
             React.createElement("div", { className: "nav-badge" }, pendingSettlements.length > 9 ? "9+" : pendingSettlements.length)
         )
       )
+    ),
+
+    // ── iOS PWA Install Banner ──
+    showIosBanner && React.createElement("div", { className: "ios-install-banner" },
+      React.createElement("span", { className: "ios-icon" }, "✈️"),
+      React.createElement("div", { className: "ios-text" },
+        React.createElement("b", null, "Install Trip Planner PRO"),
+        React.createElement("span", null,
+          "Tap ", React.createElement("span", { className: "ios-install-arrow" }, "⎋ Share"),
+          " then ", React.createElement("span", { className: "ios-install-arrow" }, "+ Add to Home Screen"),
+          " for the full app experience offline."
+        )
+      ),
+      React.createElement("button", {
+        className: "ios-dismiss",
+        onClick: () => { setShowIosBanner(false); localStorage.setItem("ios-banner-dismissed", "1"); }
+      }, "×")
     ),
 
     // ── All-Tabs Drawer (mobile) ──
