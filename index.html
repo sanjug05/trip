@@ -57,8 +57,12 @@ mark{background:#f59e0b33;color:#f59e0b;border-radius:2px;padding:0 2px}
 .fab-menu-item{display:flex;align-items:center;gap:8px}
 .fab-item-btn{padding:8px 14px;background:#1e293b;border:1px solid #334155;border-radius:20px;color:white;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.4);white-space:nowrap;cursor:pointer}
 .attention-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #334155}
-.mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(15,23,42,0.97);backdrop-filter:blur(20px);border-top:1px solid #1e293b;padding:6px 8px max(6px,env(safe-area-inset-bottom));z-index:100;justify-content:space-around;align-items:center}
-@media (max-width:768px){.mobile-bottom-nav{display:flex}.desktop-tabs{display:none!important}.fab{bottom:calc(80px + env(safe-area-inset-bottom))}}
+.mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(15,23,42,0.98);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #1e293b;padding:6px 8px max(10px,env(safe-area-inset-bottom));z-index:100;justify-content:space-around;align-items:center}
+@media (max-width:768px){.mobile-bottom-nav{display:flex}.desktop-tabs{display:none!important}.fab{bottom:calc(80px + env(safe-area-inset-bottom))}
+/* Fix 1: Status bar safe area — content must not go under iOS notch/status bar */
+body{padding-top:env(safe-area-inset-top);background:#0a0f1e}
+.sticky-header-wrap{padding-top:env(safe-area-inset-top)!important;top:0!important}
+}
 .mobile-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border-radius:12px;border:none;background:transparent;color:#64748b;font-size:10px;font-weight:500;cursor:pointer;min-width:56px}
 .mobile-nav-item.active{color:#3b82f6;background:rgba(59,130,246,0.1)}
 .mobile-nav-icon{font-size:20px}
@@ -1265,9 +1269,9 @@ const App = () => {
   const allSettlements = React.useMemo(() => {
     const paid = tripData?.settledPayments || {};
     return (expSummary.settlements || []).map(s => {
-      // Key includes rounded amount — prevents stale paid flags when amounts change
       const key = s.from + "|" + s.to + "|" + Math.round(s.amount);
-      const paidEntry = paid[key];
+      const legacyKey = s.from + "|" + s.to; // backward compat with old paid records
+      const paidEntry = paid[key] || paid[legacyKey];
       return { ...s, key, isPaid: !!paidEntry, paidAt: paidEntry?.at, paidNote: paidEntry?.note };
     });
   }, [expSummary.settlements, tripData?.settledPayments]);
@@ -1399,7 +1403,7 @@ const App = () => {
       );
     }
     if (firebaseError) {
-      return React.createElement("div", { style: { textAlign: "center", fontSize: "12px", color: "#ef4444", padding: "6px", background: "rgba(239,68,68,0.1)", borderRadius: "6px", marginBottom: "8px" } }, "⚠️ Sync error — Using local data");
+      return React.createElement("div", { style: { textAlign: "center", fontSize: "11px", color: "#64748b", padding: "4px 8px", background: "rgba(100,116,139,0.08)", borderRadius: "6px", marginBottom: "6px" } }, "📡 Offline mode — cached data");
     }
     if (isSyncing) {
       return React.createElement("div", { style: { textAlign: "center", fontSize: "12px", color: "#3b82f6", padding: "4px", background: "rgba(59,130,246,0.1)", borderRadius: "6px", marginBottom: "8px" } }, "⏳ Syncing…");
@@ -1417,10 +1421,10 @@ const App = () => {
     const wCode = parseInt(cur.weathercode || 0);
     const icon = WMO_ICONS[wCode] || "🌡️";
     const forecast = (weather.weather || []).slice(0, 3);
-    return React.createElement("div", { style: { background: "linear-gradient(135deg,#1e3a5f,#1e293b)", borderRadius: "12px", padding: "16px", border: "1px solid #1e4a7a" } },
+    return React.createElement("div", { onClick: () => setActiveTab("settings"), title: "Click to change destination city", style: { background: "linear-gradient(135deg,#1e3a5f,#1e293b)", borderRadius: "12px", padding: "16px", border: "1px solid #1e4a7a", cursor: "pointer" } },
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" } },
         React.createElement("div", null,
-          React.createElement("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "4px" } }, "📍 " + (tripData?.destinationCity || "Mumbai")),
+          React.createElement("div", { style: { fontSize: "12px", color: "#94a3b8", marginBottom: "4px" } }, "📍 " + (tripData?.destinationCity || "Mumbai") + " ✎"),
           React.createElement("div", { style: { fontSize: "36px", lineHeight: 1 } }, icon),
           React.createElement("div", { style: { fontSize: "30px", fontWeight: "bold", color: "white", marginTop: "4px" } }, cur.temp_C + "°C"),
           React.createElement("div", { style: { color: "#94a3b8", fontSize: "13px" } }, cur.weatherDesc?.[0]?.value || "")
@@ -2123,7 +2127,7 @@ const App = () => {
             b.cost > 0 && React.createElement("span", { style: { color: "#10b981", fontWeight: "700" } }, fmtAmt(b.cost)),
             isAdmin && React.createElement("div", { style: { display: "flex", gap: "6px" } },
               React.createElement("button", { onClick: () => openModal("booking", { _editId: b.id, type: b.type, title: b.title, confirmationNo: b.confirmationNo || "", date: b.date, time: b.time || "", location: b.location || "", cost: String(b.cost || ""), cancellationPolicy: b.cancellationPolicy || "", status: b.status, linkedDayId: b.linkedDayId || "" }), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: "6px", color: "#94a3b8", padding: "3px 8px", fontSize: "12px" } }, "✏️"),
-              React.createElement("button", { onClick: () => deleteBooking(b.id), style: { background: "none", border: "none", color: "#ef4444", fontSize: "12px" } }, "🗑️")
+              React.createElement("button", { onClick: () => deleteBooking(b.id), style: { background: "none", border: "none", color: "#64748b", fontSize: "11px" } }, "🗑️")
             )
           )
         )
@@ -2276,7 +2280,7 @@ const App = () => {
             React.createElement("span", { style: { color: "#10b981", fontWeight: "700" } }, fmtAmt(exp.amount)),
             React.createElement("div", { style: { display: "flex", gap: "6px" } },
               React.createElement("button", { onClick: () => openModal("expense", { _editId: exp.id, date: exp.date, description: exp.description, amount: String(exp.amount), paidBy: exp.paidBy, splitAmong: [...(exp.splitAmong || [])], category: exp.category || "Misc", linkedBookingId: exp.linkedBookingId || "" }), style: { background: "#1e293b", border: "1px solid #334155", borderRadius: "6px", color: "#94a3b8", padding: "3px 8px", fontSize: "12px" } }, "✏️"),
-              isAdmin && React.createElement("button", { onClick: () => deleteExpense(exp.id), style: { background: "none", border: "none", color: "#ef4444", fontSize: "12px" } }, "🗑️")
+              isAdmin && React.createElement("button", { onClick: () => deleteExpense(exp.id), style: { background: "none", border: "none", color: "#64748b", fontSize: "11px" } }, "🗑️")
             )
           )
         )
@@ -2406,7 +2410,7 @@ const App = () => {
         React.createElement("button", { onClick: () => votePoll(poll.id, opt), style: { padding: "4px 12px", background: "#0f172a", border: "1px solid #334155", borderRadius: "6px", color: "white", fontSize: "12px" } }, "Vote")
       ); }),
       React.createElement("div", { style: { fontSize: "11px", color: "#64748b", marginTop: "8px" } }, "Created by " + poll.createdBy + " · " + tv + " total vote" + (tv !== 1 ? "s" : "")),
-      isAdmin && React.createElement("button", { onClick: () => deletePoll(poll.id), style: { marginTop: "8px", background: "none", border: "none", color: "#ef4444", fontSize: "12px" } }, "🗑️ Delete")
+      isAdmin && React.createElement("button", { onClick: () => deletePoll(poll.id), style: { marginTop: "8px", background: "none", border: "none", color: "#64748b", fontSize: "11px" } }, "🗑️ Delete")
     ); })
   );
   
@@ -2872,7 +2876,7 @@ const App = () => {
   // ========== FINAL LAYOUT ==========
   return React.createElement("div", { style: { minHeight: "100vh", background: "linear-gradient(135deg,#0f172a,#1e1b4b)" } },
     !isOnline && React.createElement("div", { className: "offline-banner" }, React.createElement("span", null, "📡 You're offline — Changes saved locally"), React.createElement("button", { onClick: () => window.location.reload() }, "🔄 Retry Connection")),
-    React.createElement("div", { style: { position: "sticky", top: 0, zIndex: 10, background: "rgba(15,23,42,0.97)", backdropFilter: "blur(10px)", borderBottom: "1px solid #334155", padding: "10px 16px" } },
+    React.createElement("div", { className: "sticky-header-wrap", style: { position: "sticky", top: 0, zIndex: 10, background: "rgba(15,23,42,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid #334155", padding: "10px 16px" } },
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", maxWidth: "1200px", margin: "0 auto" } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 } },
           React.createElement("span", { style: { fontSize: "22px" } }, "✈️"),
