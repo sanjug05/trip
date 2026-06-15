@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Trip Planner PRO — Cloud Storage rules.
+// Receipt photos and document scans are uploaded here (compressed client-side),
+// and only their download URL is stored in Firestore — this keeps trip documents
+// small and well under Firestore's 1MB-per-document limit.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /trips/{tripId}/uploads/{fileName} {
+      // Download URLs are placed directly into <img src>, so reads are public.
+      allow read: if true;
+
+      // Uploads: signed-in users only, images only, max 5MB.
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

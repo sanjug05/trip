@@ -1,0 +1,16 @@
+# Netlify deploy config for Trip Planner PRO (single-file static app).
+
+[build]
+  publish = "."
+
+# Single-page app: serve index.html for every route so /?trip=CODE links work.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Always revalidate the HTML so new deploys reach users immediately.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

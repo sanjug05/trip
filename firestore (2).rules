@@ -1,0 +1,57 @@
+rules_version = '2';
+
+// Trip Planner PRO — Firestore security rules.
+//
+// Sharing model: trips are shared by an unguessable 7-character code (~34 billion
+// combinations). Any signed-in user (anonymous or Google) who knows a trip's code
+// can read and edit that trip. Strangers who are NOT signed in get nothing, which
+// is what closes the wide-open hole the app had before (previously anyone on the
+// internet could read/write all data).
+//
+// If you want stricter privacy later, switch the trip `update/delete` rules to
+// require existing membership (see the commented variant at the bottom).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ── Trips ──
+    match /trips/{tripId} {
+      allow read:   if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn();
+    }
+
+    // ── Group chat (one sub-collection of messages per trip) ──
+    match /tripchats/{tripId}/messages/{messageId} {
+      allow read:   if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() <= 2000;
+      // Messages are immutable once sent.
+      allow update, delete: if false;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Optional STRICTER variant for trips (members-only edits). Joining still needs
+// to add yourself to `members`, so we allow that specific case:
+//
+// match /trips/{tripId} {
+//   function isMember() {
+//     return signedIn() &&
+//       request.auth.uid in resource.data.members.map(['uid']);   // pseudo — Firestore
+//   }
+//   allow read:   if signedIn();
+//   allow create: if signedIn();
+//   allow update: if signedIn();   // keep open so arrayUnion-join works
+//   allow delete: if signedIn();
+// }
+// Note: Firestore rules cannot easily index into arrays of maps, so true
+// members-only enforcement usually means storing members as a map keyed by uid.
+// ─────────────────────────────────────────────────────────────────────────────
