@@ -24,21 +24,3 @@ service cloud.firestore {
     }
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Optional STRICTER variant for trips (members-only edits). Joining still needs
-// to add yourself to `members`, so we allow that specific case:
-//
-// match /trips/{tripId} {
-//   function isMember() {
-//     return signedIn() &&
-//       request.auth.uid in resource.data.members.map(['uid']);   // pseudo — Firestore
-//   }
-//   allow read:   if signedIn();
-//   allow create: if signedIn();
-//   allow update: if signedIn();   // keep open so arrayUnion-join works
-//   allow delete: if signedIn();
-// }
-// Note: Firestore rules cannot easily index into arrays of maps, so true
-// members-only enforcement usually means storing members as a map keyed by uid.
-// ─────────────────────────────────────────────────────────────────────────────
